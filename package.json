@@ -19,5 +19,10 @@
   "bugs": {
     "url": "https://github.com/darshangupta/urban-infra/issues"
   },
-  "homepage": "https://github.com/darshangupta/urban-infra#readme"
+  "homepage": "https://github.com/darshangupta/urban-infra#readme",
+  "dependencies": {
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "pg": "^8.16.3"
+  }
 }
