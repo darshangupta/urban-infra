@@ -112,8 +112,48 @@ class ResearchAgent:
         Returns:
             ResearchBrief: Comprehensive analysis ready for scenario planning
         """
-        # This is the interface contract - implementation comes next
-        raise NotImplementedError("Implementation pending")
+        # Step 1: Parse the query into structured components
+        parsed_query = self._parse_query(user_query)
+        
+        # Step 2: Research the neighborhood comprehensively
+        neighborhood_profile = self._research_neighborhood(parsed_query["neighborhood_name"])
+        
+        # Step 3: Perform query-specific spatial analysis
+        spatial_context = self._analyze_spatial_context(
+            parsed_query["neighborhood_key"], 
+            {"intent": parsed_query["intent"], "spatial_focus": parsed_query["spatial_focus"]}
+        )
+        # Update neighborhood profile with enhanced spatial context
+        neighborhood_profile.spatial = spatial_context
+        
+        # Step 4: Extract target metrics with intelligent defaults
+        target_metrics = self._extract_target_metrics(user_query, parsed_query["intent"])
+        
+        # Step 5: Generate planning opportunities and constraints
+        opportunities, constraints = self._generate_opportunities_constraints(
+            neighborhood_profile, parsed_query["intent"]
+        )
+        
+        # Step 6: Compile policy considerations
+        policy_considerations = self._get_policy_considerations(parsed_query["intent"], parsed_query["neighborhood_key"])
+        
+        # Step 7: Generate research notes and confidence assessment
+        research_notes = self._generate_research_notes(parsed_query, neighborhood_profile)
+        confidence_score = min(parsed_query["confidence"] + 0.15, 1.0)  # Boost for complete analysis
+        
+        # Return comprehensive research brief
+        return ResearchBrief(
+            original_query=user_query,
+            intent=parsed_query["intent"],
+            spatial_focus=parsed_query["spatial_focus"],
+            target_metrics=target_metrics,
+            neighborhood=neighborhood_profile,
+            key_opportunities=opportunities,
+            major_constraints=constraints,
+            policy_considerations=policy_considerations,
+            confidence_score=confidence_score,
+            research_notes=research_notes
+        )
     
     def _parse_query(self, query: str) -> Dict[str, Any]:
         """Parse natural language query into structured components"""
@@ -291,7 +331,71 @@ class ResearchAgent:
     
     def _analyze_spatial_context(self, neighborhood: str, query_context: Dict) -> SpatialContext:
         """Perform spatial analysis based on query requirements"""
-        raise NotImplementedError("Implementation pending")
+        # Get base spatial context for the neighborhood
+        base_spatial = self._build_spatial_context(neighborhood, {})
+        
+        # Enhance spatial analysis based on query intent and spatial focus
+        intent = query_context.get("intent", PlanningIntent.HOUSING_DEVELOPMENT)
+        spatial_focus = query_context.get("spatial_focus", SpatialFocus.GENERAL)
+        
+        # Query-specific spatial enhancements
+        enhanced_spatial = self._enhance_spatial_for_query(base_spatial, intent, spatial_focus, neighborhood)
+        
+        return enhanced_spatial
+    
+    def _enhance_spatial_for_query(self, base_spatial: SpatialContext, intent: PlanningIntent, 
+                                 spatial_focus: SpatialFocus, neighborhood_key: str) -> SpatialContext:
+        """Enhance spatial context based on query-specific requirements"""
+        
+        # Create a copy to modify
+        enhanced_data = base_spatial.dict()
+        
+        # Intent-specific spatial enhancements
+        if intent == PlanningIntent.TRANSIT_IMPROVEMENT:
+            # Provide more detailed transit analysis
+            if enhanced_data["transit_access"] == "excellent":
+                enhanced_data["walk_to_bart_min"] = min(enhanced_data.get("walk_to_bart_min", 5), 5)
+            elif enhanced_data["transit_access"] == "good":
+                enhanced_data["walk_to_bart_min"] = enhanced_data.get("walk_to_bart_min", 10)
+        
+        elif intent == PlanningIntent.CLIMATE_RESILIENCE:
+            # Enhanced flood and seismic risk analysis for climate planning
+            if neighborhood_key == "marina":
+                enhanced_data["flood_risk"] = "high"  # Emphasize flood risk for marina
+            # Could add more detailed climate projections here
+        
+        elif intent == PlanningIntent.WALKABILITY_IMPROVEMENT:
+            # Focus on pedestrian accessibility metrics
+            if enhanced_data["transit_access"] in ["excellent", "good"]:
+                # Good transit correlates with walkable neighborhoods
+                pass
+        
+        # Spatial focus enhancements
+        if spatial_focus == SpatialFocus.NEAR_TRANSIT:
+            # Prioritize transit proximity in analysis
+            if enhanced_data.get("walk_to_bart_min", 999) > 15:
+                # Flag transit accessibility concerns
+                enhanced_data["transit_access"] = "limited" if enhanced_data["transit_access"] != "excellent" else "good"
+        
+        elif spatial_focus == SpatialFocus.WATERFRONT:
+            # Emphasize waterfront-specific concerns
+            if neighborhood_key == "marina":
+                enhanced_data["flood_risk"] = "high"
+                enhanced_data["seismic_zone"] = "moderate"  # Bay fill areas have specific seismic concerns
+        
+        elif spatial_focus == SpatialFocus.HISTORIC_AREA:
+            # Check and enhance historic overlay information
+            historic_neighborhoods = ["hayes_valley"]  # Could expand this list
+            if neighborhood_key in historic_neighborhoods:
+                enhanced_data["historic_overlay"] = True
+        
+        elif spatial_focus == SpatialFocus.CULTURAL_DISTRICT:
+            # Mission has significant cultural assets to consider
+            if neighborhood_key == "mission":
+                # Cultural districts may have additional preservation concerns
+                pass
+        
+        return SpatialContext(**enhanced_data)
     
     def _extract_target_metrics(self, query: str, intent: PlanningIntent) -> TargetMetrics:
         """Extract specific numeric targets from query"""
@@ -473,6 +577,56 @@ class ResearchAgent:
             opportunities.append("Transit-supportive density encourages ridership")
         
         return opportunities, constraints
+    
+    def _get_policy_considerations(self, intent: PlanningIntent, neighborhood_key: str) -> List[str]:
+        """Generate policy considerations based on intent and neighborhood"""
+        base_policies = ["SF Planning Code compliance required", "Community input process needed"]
+        
+        intent_policies = {
+            PlanningIntent.HOUSING_DEVELOPMENT: ["Inclusionary housing requirements", "CEQA review"],
+            PlanningIntent.ANTI_DISPLACEMENT: ["Tenant protections", "Community benefits agreement"],
+            PlanningIntent.CLIMATE_RESILIENCE: ["Sea level rise projections", "Building code updates"],
+            PlanningIntent.WALKABILITY_IMPROVEMENT: ["ADA compliance", "Traffic impact analysis"],
+            PlanningIntent.TRANSIT_IMPROVEMENT: ["Transit impact fees", "BART coordination required"],
+            PlanningIntent.MIXED_USE_DEVELOPMENT: ["Ground floor activation requirements", "Parking ratios for mixed use"]
+        }
+        
+        # Neighborhood-specific policy considerations
+        neighborhood_policies = {
+            "marina": ["Flood zone development standards", "Liquefaction mitigation required"],
+            "hayes_valley": ["Historic preservation review", "Hayes Valley Plan compliance"],
+            "mission": ["Cultural district guidelines", "Mission Area Plan requirements"]
+        }
+        
+        all_policies = base_policies + intent_policies.get(intent, []) + neighborhood_policies.get(neighborhood_key, [])
+        return all_policies
+    
+    def _generate_research_notes(self, parsed_query: Dict, neighborhood_profile) -> List[str]:
+        """Generate research notes highlighting key assumptions and caveats"""
+        notes = []
+        
+        # Confidence-based notes
+        if parsed_query["confidence"] < 0.5:
+            notes.append("Low confidence in query interpretation - recommend clarification")
+        
+        # Neighborhood-specific notes
+        if neighborhood_profile.name == "marina":
+            notes.append("Marina development subject to flood risk and liquefaction concerns")
+        elif neighborhood_profile.name == "hayes_valley":
+            notes.append("Hayes Valley transit proximity enables parking reductions")
+        elif neighborhood_profile.name == "mission":
+            notes.append("Mission cultural preservation requires community engagement")
+        
+        # Intent-specific research notes
+        if parsed_query["intent"] == PlanningIntent.ANTI_DISPLACEMENT:
+            notes.append("Anti-displacement strategies require ongoing monitoring and enforcement")
+        elif parsed_query["intent"] == PlanningIntent.CLIMATE_RESILIENCE:
+            notes.append("Climate projections based on current SF planning guidance")
+        
+        # Add data source note
+        notes.append(f"Analysis based on {neighborhood_profile.display_name} current zoning and demographic data")
+        
+        return notes
 
 
 # Example usage and testing
