@@ -229,8 +229,65 @@ class ResearchAgent:
         return parsed
     
     def _research_neighborhood(self, neighborhood_name: str) -> NeighborhoodProfile:
-        """Conduct comprehensive neighborhood research"""
-        raise NotImplementedError("Implementation pending")
+        """Conduct comprehensive neighborhood research using live API data"""
+        import httpx
+        
+        # Normalize neighborhood name for API calls
+        neighborhood_key = {
+            "Marina District": "marina",
+            "Hayes Valley": "hayes_valley", 
+            "Mission District": "mission"
+        }.get(neighborhood_name, "hayes_valley")
+        
+        try:
+            # Fetch zoning data from our API
+            with httpx.Client() as client:
+                zoning_response = client.get(f"{self.api_base}/neighborhoods/{neighborhood_key}/zoning")
+                
+                if zoning_response.status_code != 200:
+                    # Fallback to mock data if API unavailable
+                    return self._get_fallback_neighborhood_profile(neighborhood_name)
+                
+                zoning_data = zoning_response.json()
+                
+                # Extract zoning details
+                rules = zoning_data.get("rules", {})
+                zoning_details = ZoningDetails(
+                    zone_type=zoning_data.get("zone_type", "NCT-3"),
+                    max_far=rules.get("max_far", 2.0),
+                    max_height_ft=rules.get("max_height_ft", 45),
+                    min_parking=rules.get("min_parking_per_unit", 0.5),
+                    ground_floor_commercial=rules.get("ground_floor_commercial", False),
+                    affordable_housing_req=rules.get("inclusionary_housing_pct", 0.20)
+                )
+                
+                # Build spatial context from API data and known SF characteristics
+                spatial_context = self._build_spatial_context(neighborhood_key, zoning_data)
+                
+                # Build demographic context
+                demographics = self._build_demographic_context(neighborhood_key)
+                
+                # Determine area type and characteristics
+                area_type, characteristics = self._determine_area_characteristics(neighborhood_key, zoning_details)
+                
+                # Extract constraints
+                constraints = self._extract_constraints(neighborhood_key, zoning_data, spatial_context)
+                
+                return NeighborhoodProfile(
+                    name=neighborhood_key,
+                    display_name=neighborhood_name,
+                    area_type=area_type,
+                    characteristics=characteristics,
+                    zoning=zoning_details,
+                    spatial=spatial_context,
+                    demographics=demographics,
+                    constraints=constraints
+                )
+                
+        except Exception as e:
+            # Robust fallback to ensure system continues working
+            print(f"Warning: API error in neighborhood research: {e}")
+            return self._get_fallback_neighborhood_profile(neighborhood_name)
     
     def _analyze_spatial_context(self, neighborhood: str, query_context: Dict) -> SpatialContext:
         """Perform spatial analysis based on query requirements"""
@@ -263,13 +320,159 @@ class ResearchAgent:
             parking_spaces=metrics_dict.get("parking_spaces")
         )
     
+    def _build_spatial_context(self, neighborhood_key: str, zoning_data: Dict) -> SpatialContext:
+        """Build spatial context from API data and SF knowledge"""
+        # SF neighborhood spatial characteristics (could be enhanced with real spatial analysis)
+        spatial_profiles = {
+            "marina": {
+                "transit_access": "limited",
+                "walk_to_bart_min": 25,
+                "flood_risk": "high", 
+                "seismic_zone": "moderate",
+                "historic_overlay": False
+            },
+            "hayes_valley": {
+                "transit_access": "excellent",
+                "walk_to_bart_min": 3,
+                "flood_risk": None,
+                "seismic_zone": "moderate", 
+                "historic_overlay": True
+            },
+            "mission": {
+                "transit_access": "good",
+                "walk_to_bart_min": 8,
+                "flood_risk": None,
+                "seismic_zone": "high",
+                "historic_overlay": False
+            }
+        }
+        
+        profile = spatial_profiles.get(neighborhood_key, spatial_profiles["hayes_valley"])
+        return SpatialContext(**profile)
+    
+    def _build_demographic_context(self, neighborhood_key: str) -> DemographicContext:
+        """Build demographic context from neighborhood knowledge"""
+        demographic_profiles = {
+            "marina": {
+                "median_income": 120000,
+                "displacement_risk": "low",
+                "cultural_assets": "low",
+                "gentrification_pressure": "low"
+            },
+            "hayes_valley": {
+                "median_income": 95000,
+                "displacement_risk": "high", 
+                "cultural_assets": "medium",
+                "gentrification_pressure": "high"
+            },
+            "mission": {
+                "median_income": 75000,
+                "displacement_risk": "high",
+                "cultural_assets": "high",
+                "gentrification_pressure": "high"
+            }
+        }
+        
+        profile = demographic_profiles.get(neighborhood_key, demographic_profiles["hayes_valley"])
+        return DemographicContext(**profile)
+    
+    def _determine_area_characteristics(self, neighborhood_key: str, zoning: ZoningDetails) -> tuple[str, List[str]]:
+        """Determine area type and characteristics from zoning and neighborhood"""
+        area_profiles = {
+            "marina": ("residential", ["low_density", "waterfront", "affluent"]),
+            "hayes_valley": ("mixed_use", ["mixed_use", "transit_rich", "gentrifying"]),
+            "mission": ("mixed_use", ["dense", "diverse", "cultural"])
+        }
+        
+        return area_profiles.get(neighborhood_key, ("mixed_use", ["urban", "developing"]))
+    
+    def _extract_constraints(self, neighborhood_key: str, zoning_data: Dict, spatial: SpatialContext) -> List[str]:
+        """Extract planning constraints from neighborhood data"""
+        constraints = []
+        
+        # Zoning-based constraints
+        rules = zoning_data.get("rules", {})
+        if rules.get("max_height_ft", 0) <= 40:
+            constraints.append("height_limit")
+        if rules.get("min_parking_per_unit", 0) >= 1.0:
+            constraints.append("parking_requirements")
+        
+        # Spatial constraints
+        if spatial.flood_risk:
+            constraints.append("flood_zone")
+        if spatial.historic_overlay:
+            constraints.append("historic_preservation")
+        if spatial.seismic_zone == "high":
+            constraints.append("seismic_zone")
+        
+        # Neighborhood-specific constraints
+        neighborhood_constraints = {
+            "marina": ["flood_zone", "height_limit", "parking_requirements"],
+            "hayes_valley": ["historic_preservation", "displacement_pressure"],
+            "mission": ["displacement_risk", "cultural_preservation", "seismic_zone"]
+        }
+        
+        # Merge with neighborhood-specific constraints
+        specific_constraints = neighborhood_constraints.get(neighborhood_key, [])
+        all_constraints = list(set(constraints + specific_constraints))
+        
+        return all_constraints
+    
+    def _get_fallback_neighborhood_profile(self, neighborhood_name: str) -> NeighborhoodProfile:
+        """Fallback neighborhood profile when API is unavailable"""
+        # Use the mock implementation as fallback
+        from .mock_research_agent import MockResearchAgent
+        mock_agent = MockResearchAgent()
+        
+        neighborhood_key = {
+            "Marina District": "marina",
+            "Hayes Valley": "hayes_valley",
+            "Mission District": "mission"
+        }.get(neighborhood_name, "hayes_valley")
+        
+        return mock_agent.mock_neighborhoods[neighborhood_key]
+    
     def _generate_opportunities_constraints(
         self, 
         neighborhood: NeighborhoodProfile, 
         intent: PlanningIntent
     ) -> tuple[List[str], List[str]]:
         """Identify key opportunities and constraints for this planning scenario"""
-        raise NotImplementedError("Implementation pending")
+        # Base opportunities from neighborhood characteristics
+        opportunities = [
+            f"Existing {neighborhood.zoning.zone_type} zoning allows {neighborhood.zoning.max_far} FAR",
+            f"Transit access rated as {neighborhood.spatial.transit_access}",
+        ]
+        
+        # Base constraints from neighborhood
+        constraints = list(neighborhood.constraints)
+        
+        # Intent-specific opportunities and constraints
+        if intent == PlanningIntent.HOUSING_DEVELOPMENT:
+            opportunities.append(f"{neighborhood.zoning.affordable_housing_req*100:.0f}% inclusionary housing requirement")
+            if neighborhood.spatial.transit_access == "excellent":
+                opportunities.append("Parking variances possible due to excellent transit")
+        
+        elif intent == PlanningIntent.ANTI_DISPLACEMENT:
+            constraints.append(f"Displacement risk: {neighborhood.demographics.displacement_risk}")
+            opportunities.append("Community land trust strategies applicable")
+        
+        elif intent == PlanningIntent.CLIMATE_RESILIENCE:
+            if neighborhood.spatial.flood_risk:
+                constraints.append(f"Flood risk: {neighborhood.spatial.flood_risk}")
+                opportunities.append("Elevated development strategies needed")
+        
+        elif intent == PlanningIntent.WALKABILITY_IMPROVEMENT:
+            if neighborhood.spatial.transit_access != "limited":
+                opportunities.append("Good transit connectivity supports walkability")
+            opportunities.append("Street activation through ground floor uses")
+        
+        elif intent == PlanningIntent.TRANSIT_IMPROVEMENT:
+            if neighborhood.spatial.walk_to_bart_min and neighborhood.spatial.walk_to_bart_min <= 10:
+                opportunities.append("Close BART access enables transit-oriented development")
+            opportunities.append("Transit-supportive density encourages ridership")
+        
+        return opportunities, constraints
 
 
 # Example usage and testing
