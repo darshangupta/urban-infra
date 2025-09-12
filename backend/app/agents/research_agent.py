@@ -150,14 +150,14 @@ class ResearchAgent:
             if parsed["neighborhood_name"]:
                 break
         
-        # Intent detection with priority ordering
+        # Intent detection with priority ordering (most specific first)
         intent_patterns = [
-            (PlanningIntent.ANTI_DISPLACEMENT, ["displacement", "displace", "gentrification", "anti-displacement", "community", "preserve residents"]),
-            (PlanningIntent.CLIMATE_RESILIENCE, ["flood", "climate", "resilience", "sea level", "adaptation", "waterfront protection"]),
-            (PlanningIntent.WALKABILITY_IMPROVEMENT, ["walkable", "walkability", "pedestrian", "bike", "active transport"]),
-            (PlanningIntent.TRANSIT_IMPROVEMENT, ["transit", "bart", "muni", "transportation", "commute"]),
-            (PlanningIntent.MIXED_USE_DEVELOPMENT, ["mixed use", "mixed-use", "commercial", "ground floor", "retail"]),
-            (PlanningIntent.HOUSING_DEVELOPMENT, ["housing", "units", "development", "affordable", "homes", "residential"])
+            (PlanningIntent.ANTI_DISPLACEMENT, ["displacement", "displace", "gentrification", "anti-displacement", "preserve residents", "without displacing"]),
+            (PlanningIntent.WALKABILITY_IMPROVEMENT, ["walkable", "walkability", "pedestrian", "bike", "active transport", "more walkable"]),
+            (PlanningIntent.CLIMATE_RESILIENCE, ["flood", "climate", "resilience", "sea level", "adaptation", "climate-resilient"]),
+            (PlanningIntent.MIXED_USE_DEVELOPMENT, ["mixed use", "mixed-use", "ground floor", "retail", "commercial"]),
+            (PlanningIntent.TRANSIT_IMPROVEMENT, ["transit-oriented", "near transit", "transportation", "commute"]),
+            (PlanningIntent.HOUSING_DEVELOPMENT, ["housing", "units", "development", "affordable", "homes", "residential", "bart"])
         ]
         
         for intent, keywords in intent_patterns:
@@ -183,16 +183,16 @@ class ResearchAgent:
         # Extract numeric targets using regex
         numbers = re.findall(r'\b(\d+)\b', query)
         
-        # Context-aware numeric extraction
+        # Context-aware numeric extraction - check in specific order
         for num_str in numbers:
             num = int(num_str)
             
-            # Units detection
-            if re.search(rf'\b{num}\s*(units?|homes?|apartments?|housing)\b', query_lower):
+            # Units detection (allow words in between)
+            if re.search(rf'\b{num}\s+.*?\b(units?|homes?|apartments?)\b', query_lower):
                 parsed["target_metrics"]["units"] = num
                 parsed["confidence"] += 0.1
             
-            # Height detection
+            # Height detection  
             elif re.search(rf'\b{num}\s*(ft|feet|stories?|floors?)\b', query_lower):
                 if "ft" in query_lower or "feet" in query_lower:
                     parsed["target_metrics"]["height_ft"] = num
@@ -200,8 +200,9 @@ class ResearchAgent:
                     parsed["target_metrics"]["height_ft"] = num * 12
                 parsed["confidence"] += 0.1
             
-            # Affordability percentage
-            elif re.search(rf'\b{num}%?\s*(affordable|inclusionary)\b', query_lower):
+            # Affordability percentage (with % sign or explicit "affordable/inclusionary")
+            elif re.search(rf'\b{num}%\s*(affordable|inclusionary)?\b', query_lower) or \
+                 re.search(rf'\b{num}\s*percent\s*(affordable|inclusionary)\b', query_lower):
                 parsed["target_metrics"]["affordability_pct"] = num / 100.0 if num > 1 else num
                 parsed["confidence"] += 0.1
         

@@ -6,9 +6,20 @@ Verifies sophisticated parsing of natural language queries
 
 import sys
 import os
-sys.path.append('backend')
 
-from backend.app.agents.research_agent import ResearchAgent, PlanningIntent, SpatialFocus
+# Add backend to path and import directly to avoid __init__.py issues  
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+
+# Import the classes directly from the file to avoid __init__.py
+import importlib.util
+spec = importlib.util.spec_from_file_location("research_agent", 
+    os.path.join(os.path.dirname(__file__), 'backend', 'app', 'agents', 'research_agent.py'))
+research_agent_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(research_agent_module)
+
+ResearchAgent = research_agent_module.ResearchAgent
+PlanningIntent = research_agent_module.PlanningIntent  
+SpatialFocus = research_agent_module.SpatialFocus
 
 def test_query_parser():
     print("🔍 Testing Enhanced Query Parser Module")
