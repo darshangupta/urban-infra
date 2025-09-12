@@ -149,7 +149,86 @@ class PlannerAgent:
     
     def _validate_plan_feasibility(self, plan: DevelopmentPlan, neighborhood_key: str) -> DevelopmentPlan:
         """Validate plan against zoning constraints using API"""
-        raise NotImplementedError("Implementation pending")
+        try:
+            # Prepare proposal data for validation API
+            proposal_data = {
+                "far": plan.far,
+                "height_ft": plan.height_ft,
+                "lot_area_sf": plan.lot_area_sf,
+                "num_units": plan.total_units
+            }
+            
+            # Call our constraint validation API
+            with httpx.Client() as client:
+                response = client.post(
+                    f"{self.api_base}/neighborhoods/{neighborhood_key}/validate-proposal",
+                    json=proposal_data,
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    validation_result = response.json()
+                    
+                    # Update plan with validation results
+                    updated_plan = plan.copy(deep=True)
+                    
+                    # Convert violation objects to readable strings
+                    raw_violations = validation_result.get("violations", [])
+                    updated_plan.violations = []
+                    
+                    for violation in raw_violations:
+                        if isinstance(violation, dict):
+                            rule = violation.get("rule", "Unknown")
+                            current = violation.get("current_value", "N/A")
+                            max_allowed = violation.get("max_allowed", "N/A")
+                            violation_str = f"{rule}: {current} exceeds limit of {max_allowed}"
+                            updated_plan.violations.append(violation_str)
+                        else:
+                            updated_plan.violations.append(str(violation))
+                    
+                    # Determine feasibility based on validation
+                    is_valid = validation_result.get("is_valid", False)
+                    violation_count = len(updated_plan.violations)
+                    
+                    if is_valid and violation_count == 0:
+                        updated_plan.feasibility = PlanFeasibility.FULLY_COMPLIANT
+                        updated_plan.compliance_score = 1.0
+                    elif violation_count <= 2:  # Minor violations
+                        updated_plan.feasibility = PlanFeasibility.REQUIRES_VARIANCES
+                        updated_plan.compliance_score = max(0.7, 1.0 - (violation_count * 0.1))
+                    elif violation_count <= 4:  # Major violations
+                        updated_plan.feasibility = PlanFeasibility.NEEDS_REZONING
+                        updated_plan.compliance_score = max(0.4, 1.0 - (violation_count * 0.15))
+                    else:  # Severe violations
+                        updated_plan.feasibility = PlanFeasibility.NOT_FEASIBLE
+                        updated_plan.compliance_score = min(0.3, 1.0 - (violation_count * 0.2))
+                    
+                    # Update zoning compliance description
+                    if updated_plan.violations:
+                        violation_summary = ", ".join(updated_plan.violations[:2])
+                        if len(updated_plan.violations) > 2:
+                            violation_summary += f" +{len(updated_plan.violations)-2} more"
+                        updated_plan.zoning_compliance = f"Violations: {violation_summary}"
+                    else:
+                        updated_plan.zoning_compliance = "Fully compliant with zoning requirements"
+                    
+                    return updated_plan
+                    
+                else:
+                    # API call failed - return original plan with warning
+                    plan.violations = [f"API validation failed: HTTP {response.status_code}"]
+                    plan.compliance_score = 0.5  # Unknown compliance
+                    return plan
+                    
+        except httpx.TimeoutException:
+            plan.violations = ["Validation timeout - constraint checking unavailable"]
+            plan.compliance_score = 0.5
+            return plan
+            
+        except Exception as e:
+            plan.violations = [f"Validation error: {str(e)}"]
+            plan.compliance_score = 0.5
+            return plan
     
     def _optimize_plans(self, plans: List[DevelopmentPlan], research_brief: Any) -> List[DevelopmentPlan]:
         """Rank and optimize plans based on feasibility and policy alignment"""
