@@ -1,10 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 import logging
 
 from app.core.config import settings
-from app.core.database import init_db
 from app.api.v1.router import api_router
 
 
@@ -16,14 +14,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Starting Urban-Infra API...")
-    await init_db()
-    logger.info("Database initialized")
-    yield
-    # Shutdown
+async def startup():
+    """Application startup"""
+    logger.info("Starting Urban-Infra API with Supabase...")
+    logger.info("Database: Supabase REST API")
+
+async def shutdown():
+    """Application shutdown"""
     logger.info("Shutting down Urban-Infra API...")
 
 
@@ -31,9 +28,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
-    description="Multi-agent system for urban planning analysis",
-    lifespan=lifespan
+    description="Multi-agent system for urban planning analysis"
 )
+
+# Add event handlers
+app.add_event_handler("startup", startup)
+app.add_event_handler("shutdown", shutdown)
 
 # Add CORS middleware
 app.add_middleware(

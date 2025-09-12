@@ -4,20 +4,10 @@ from sqlalchemy.orm import sessionmaker
 from .config import settings
 import os
 
-# For local development, use SQLite if PostgreSQL is not available
-database_url = settings.DATABASE_URL or settings.db_url
+# Always use DATABASE_URL (prioritize Supabase)
+database_url = settings.db_url
 
-# Check if we're in development mode and PostgreSQL is not available
-if settings.DEBUG and "postgresql" in database_url:
-    try:
-        engine = create_engine(database_url, echo=settings.DEBUG)
-        # Test connection
-        with engine.connect():
-            pass
-    except Exception:
-        # Fall back to SQLite for local development
-        database_url = "sqlite:///./urban_infra.db"
-        print(f"PostgreSQL not available, using SQLite: {database_url}")
+print(f"Using database: {database_url[:50]}{'...' if len(database_url) > 50 else ''}")
 
 # Create database engine
 engine = create_engine(

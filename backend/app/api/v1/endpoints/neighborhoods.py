@@ -2,23 +2,20 @@
 Neighborhoods API - SF neighborhood data and constraints
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 
-from app.core.database import get_db
 from app.core.constraints import SFPlanningValidator, SFZoneType, ConstraintViolation
-from app.services.neighborhood_service import NeighborhoodService
+from app.services.supabase_neighborhood_service import neighborhood_service
 
 router = APIRouter()
 
 
 @router.get("/")
-async def list_neighborhoods(db: Session = Depends(get_db)):
+async def list_neighborhoods():
     """Get all SF neighborhoods with zoning info"""
     try:
-        service = NeighborhoodService(db)
-        neighborhoods = await service.get_all_neighborhoods()
+        neighborhoods = await neighborhood_service.get_all_neighborhoods()
         return {
             "neighborhoods": neighborhoods,
             "count": len(neighborhoods)
@@ -31,25 +28,26 @@ async def list_neighborhoods(db: Session = Depends(get_db)):
 async def get_neighborhood_zoning(neighborhood: str):
     """Get zoning rules for a specific neighborhood"""
     try:
-        validator = SFPlanningValidator()
-        zone_type = validator.get_neighborhood_zoning(neighborhood)
-        rules = validator.rules.get(zone_type)
+        # Get neighborhood data from Supabase
+        neighborhood_data = await neighborhood_service.get_zoning_details(neighborhood)
         
-        if not rules:
-            raise HTTPException(status_code=404, detail=f"Zoning rules not found for {neighborhood}")
+        if not neighborhood_data:
+            raise HTTPException(status_code=404, detail=f"Neighborhood not found: {neighborhood}")
         
         return {
-            "neighborhood": neighborhood,
-            "zone_type": zone_type.value,
+            "neighborhood": neighborhood_data["neighborhood"],
+            "zone_type": neighborhood_data["zoning_type"],
             "rules": {
-                "max_far": rules.max_far,
-                "max_height_ft": rules.max_height_ft,
-                "min_rear_yard_ft": rules.min_rear_yard_ft,
-                "parking_required": rules.parking_required,
-                "ground_floor_commercial": rules.ground_floor_commercial,
-                "affordable_housing_req": rules.affordable_housing_req
-            }
+                "max_far": neighborhood_data["max_far"],
+                "max_height_ft": neighborhood_data["max_height_ft"],
+                "min_parking": neighborhood_data["min_parking"],
+                "ground_floor_commercial": neighborhood_data["ground_floor_commercial"],
+                "affordable_housing_req": neighborhood_data["inclusionary_pct"]
+            },
+            "constraints": neighborhood_data["constraints"]
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

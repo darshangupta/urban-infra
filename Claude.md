@@ -184,10 +184,19 @@ Visualization: D3.js for KPI charts
 
 ### Development Environment  
 ```yaml
-Containerization: Docker + Docker Compose
-Database Admin: Drizzle Studio (port 4983)
-API Docs: FastAPI auto-generated (port 8000/docs)
+Local Development: Docker + Docker Compose
+Database Admin: Supabase Dashboard (production-ready)
+API Docs: FastAPI auto-generated (local + deployed)
 Code Quality: pytest + black + type checking
+```
+
+### Production Deployment
+```yaml
+Database: Supabase (PostgreSQL + PostGIS + dashboard)
+Backend API: Vercel (FastAPI as serverless functions)
+Frontend: Vercel (Next.js + ShadCN + MapLibre)
+Domain: Custom domain via Vercel
+Monitoring: Vercel Analytics + Supabase Logs
 ```
 
 ---
@@ -442,3 +451,5 @@ curl http://localhost:8000/api/v1/neighborhoods/ | jq
 *Last Updated: September 2024*
 *Status: Active Development*
 *License: [To be determined]*
+
+Avoid redundancy in code! make sure we are succint and efficient in how we write
