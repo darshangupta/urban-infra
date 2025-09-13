@@ -102,8 +102,109 @@ class PlannerAgent:
         Returns:
             PlanningAlternatives: Multiple feasible development scenarios
         """
-        # This is the interface contract - implementation comes next
-        raise NotImplementedError("Implementation pending")
+        # Step 1: Generate candidate development plans
+        candidate_plans = self._generate_candidate_plans(research_brief)
+        
+        # Step 2: Validate each plan against zoning constraints
+        validated_plans = []
+        neighborhood_key = research_brief.neighborhood.name
+        
+        for plan in candidate_plans:
+            validated_plan = self._validate_plan_feasibility(plan, neighborhood_key)
+            validated_plans.append(validated_plan)
+        
+        # Step 3: Optimize and rank plans
+        optimized_plans = self._optimize_plans(validated_plans, research_brief)
+        
+        # Step 4: Generate comparative analysis
+        analysis = self._generate_comparative_analysis(optimized_plans, research_brief)
+        
+        # Step 5: Extract planning context
+        planning_context = self._extract_planning_context(research_brief)
+        
+        # Step 6: Determine recommended plan (highest scoring)
+        recommended_plan_id = optimized_plans[0].plan_id if optimized_plans else "none"
+        
+        # Step 7: Generate scenario name
+        scenario_name = f"{research_brief.neighborhood.display_name} {research_brief.intent.replace('_', ' ').title()}"
+        
+        # Step 8: Calculate generation confidence
+        generation_confidence = self._calculate_generation_confidence(optimized_plans, research_brief)
+        
+        # Step 9: Generate planning notes
+        planning_notes = self._generate_planning_notes(optimized_plans, research_brief)
+        
+        return PlanningAlternatives(
+            scenario_name=scenario_name,
+            original_query=research_brief.original_query,
+            neighborhood=research_brief.neighborhood.display_name,
+            planning_intent=str(research_brief.intent),
+            plans=optimized_plans,
+            recommended_plan_id=recommended_plan_id,
+            feasibility_summary=analysis["feasibility_summary"],
+            tradeoffs_analysis=analysis["tradeoffs_analysis"],
+            zoning_opportunities=planning_context["zoning_opportunities"],
+            regulatory_challenges=planning_context["regulatory_challenges"],
+            community_considerations=planning_context["community_considerations"],
+            generation_confidence=generation_confidence,
+            planning_notes=planning_notes
+        )
+    
+    def _calculate_generation_confidence(self, plans: List[DevelopmentPlan], research_brief: Any) -> float:
+        """Calculate confidence in the generated planning alternatives"""
+        if not plans:
+            return 0.0
+        
+        confidence = 0.8  # Base confidence
+        
+        # Boost confidence based on plan quality
+        avg_compliance = sum(p.compliance_score for p in plans) / len(plans)
+        confidence += (avg_compliance - 0.5) * 0.2  # Up to +0.2 for high compliance
+        
+        # Boost confidence if we have variety in feasibility
+        feasibility_types = set(p.feasibility for p in plans)
+        if len(feasibility_types) > 1:
+            confidence += 0.1
+        
+        # Reduce confidence for API validation errors
+        validation_errors = sum(1 for p in plans if any("error" in v.lower() for v in p.violations))
+        confidence -= validation_errors * 0.1
+        
+        return max(0.1, min(1.0, confidence))
+    
+    def _generate_planning_notes(self, plans: List[DevelopmentPlan], research_brief: Any) -> List[str]:
+        """Generate planning notes highlighting key assumptions and recommendations"""
+        notes = []
+        
+        if not plans:
+            notes.append("No feasible plans could be generated for this scenario")
+            return notes
+        
+        # Note about plan validation
+        if any("error" in str(p.violations).lower() for p in plans):
+            notes.append("Some plans could not be fully validated against zoning constraints")
+        
+        # Note about neighborhood characteristics
+        neighborhood = research_brief.neighborhood
+        notes.append(f"Analysis based on {neighborhood.display_name} {neighborhood.zoning.zone_type} zoning")
+        
+        # Note about constraints
+        if len(research_brief.major_constraints) > 2:
+            notes.append(f"Multiple constraints identified: {', '.join(research_brief.major_constraints[:2])}")
+        
+        # Note about high-performing plans
+        top_plan = plans[0]  # Optimized list has best plan first
+        if top_plan.compliance_score > 0.9:
+            notes.append(f"Recommended plan ({top_plan.name}) achieves high compliance with minimal variances")
+        elif top_plan.compliance_score < 0.6:
+            notes.append("All scenarios require significant variances or rezoning - consider revising targets")
+        
+        # Note about affordability
+        affordable_plans = [p for p in plans if p.affordable_percentage and p.affordable_percentage > 0.25]
+        if affordable_plans:
+            notes.append(f"{len(affordable_plans)} plans exceed 25% affordability through innovative financing")
+        
+        return notes
     
     def _generate_candidate_plans(self, research_brief: Any) -> List[DevelopmentPlan]:
         """Generate 3-5 candidate development plans with varying approaches"""
@@ -232,12 +333,201 @@ class PlannerAgent:
     
     def _optimize_plans(self, plans: List[DevelopmentPlan], research_brief: Any) -> List[DevelopmentPlan]:
         """Rank and optimize plans based on feasibility and policy alignment"""
-        raise NotImplementedError("Implementation pending")
+        
+        # Calculate optimization scores for each plan
+        scored_plans = []
+        for plan in plans:
+            score = self._calculate_plan_score(plan, research_brief)
+            scored_plans.append((plan, score))
+        
+        # Sort by score (highest first)
+        scored_plans.sort(key=lambda x: x[1], reverse=True)
+        
+        # Return optimized plans in ranked order
+        return [plan for plan, score in scored_plans]
+    
+    def _calculate_plan_score(self, plan: DevelopmentPlan, research_brief: Any) -> float:
+        """Calculate optimization score for plan based on multiple criteria"""
+        score = 0.0
+        
+        # 1. Compliance Score (40% weight)
+        compliance_weight = 0.4
+        score += plan.compliance_score * compliance_weight
+        
+        # 2. Target Achievement Score (30% weight) 
+        target_weight = 0.3
+        target_score = self._calculate_target_achievement_score(plan, research_brief)
+        score += target_score * target_weight
+        
+        # 3. Policy Alignment Score (20% weight)
+        policy_weight = 0.2
+        policy_score = self._calculate_policy_alignment_score(plan, research_brief)
+        score += policy_score * policy_weight
+        
+        # 4. Innovation Score (10% weight)
+        innovation_weight = 0.1
+        innovation_score = self._calculate_innovation_score(plan, research_brief)
+        score += innovation_score * innovation_weight
+        
+        return min(score, 1.0)  # Cap at 1.0
+    
+    def _calculate_target_achievement_score(self, plan: DevelopmentPlan, research_brief: Any) -> float:
+        """Score how well plan achieves target metrics"""
+        score = 0.0
+        target_metrics = research_brief.target_metrics
+        
+        # Units target achievement
+        if target_metrics.units:
+            units_ratio = plan.total_units / target_metrics.units
+            # Score peaks at 1.0 for exact match, decreases for over/under
+            if units_ratio <= 1.0:
+                units_score = units_ratio  # Reward getting close to target
+            else:
+                units_score = 1.0 / units_ratio  # Penalize excessive units
+            score += units_score * 0.5
+        else:
+            score += 0.5  # Default if no target specified
+        
+        # Affordability target achievement
+        if target_metrics.affordability_pct:
+            if plan.affordable_percentage >= target_metrics.affordability_pct:
+                affordability_score = 1.0  # Full score for meeting/exceeding
+            else:
+                affordability_score = plan.affordable_percentage / target_metrics.affordability_pct
+            score += affordability_score * 0.5
+        else:
+            # Reward any affordability when none specified
+            score += min(plan.affordable_percentage * 2, 0.5)
+        
+        return min(score, 1.0)
+    
+    def _calculate_policy_alignment_score(self, plan: DevelopmentPlan, research_brief: Any) -> float:
+        """Score alignment with planning intent and policies"""
+        score = 0.0
+        intent = str(research_brief.intent)
+        
+        # Intent-specific scoring
+        if intent == "housing_development":
+            # Reward high unit count and affordability
+            score += min(plan.total_units / 30.0, 0.5)  # Up to 0.5 for units
+            score += min(plan.affordable_percentage * 2, 0.5)  # Up to 0.5 for affordability
+        
+        elif intent == "anti_displacement":
+            # Reward high affordability and community benefits
+            score += min(plan.affordable_percentage * 2.5, 0.7)  # High weight on affordability
+            if "community" in plan.name.lower() or plan.plan_type.value == "innovative":
+                score += 0.3  # Bonus for community-focused plans
+        
+        elif intent == "climate_resilience": 
+            # Reward climate-adaptive features
+            if "climate" in plan.name.lower() or "elevated" in plan.description.lower():
+                score += 0.5
+            if plan.plan_type.value == "innovative":
+                score += 0.3
+            score += 0.2  # Base score for any plan in climate context
+        
+        elif intent == "walkability_improvement":
+            # Reward mixed-use and pedestrian features
+            if plan.ground_floor_commercial_sf and plan.ground_floor_commercial_sf > 1000:
+                score += 0.4  # Reward substantial ground floor commercial
+            if plan.parking_spaces < plan.total_units * 0.5:  # Low parking ratio
+                score += 0.3  # Reward walkability-supporting parking
+            score += 0.3  # Base score
+        
+        elif intent == "transit_improvement":
+            # Reward density near transit
+            if plan.parking_spaces < plan.total_units * 0.7:  # Transit-supportive parking
+                score += 0.4
+            score += min(plan.total_units / 25.0, 0.6)  # Reward density
+        
+        else:
+            score = 0.5  # Default score for other intents
+        
+        return min(score, 1.0)
+    
+    def _calculate_innovation_score(self, plan: DevelopmentPlan, research_brief: Any) -> float:
+        """Score plan innovation and creative solutions"""
+        score = 0.0
+        
+        # Plan type innovation scoring
+        if plan.plan_type == PlanType.INNOVATIVE:
+            score += 0.6
+        elif plan.plan_type == PlanType.AGGRESSIVE:
+            score += 0.4
+        elif plan.plan_type == PlanType.MODERATE:
+            score += 0.2
+        # Conservative gets 0.0 for innovation
+        
+        # Design rationale complexity
+        unique_rationale_count = len(set(plan.design_rationale))
+        score += min(unique_rationale_count / 10.0, 0.3)  # Up to 0.3 for diverse rationale
+        
+        # Variance requirements as innovation indicator
+        if len(plan.required_variances) > 0:
+            score += min(len(plan.required_variances) / 5.0, 0.1)  # Small bonus for creative variances
+        
+        return min(score, 1.0)
     
     def _generate_comparative_analysis(self, plans: List[DevelopmentPlan], 
                                      research_brief: Any) -> Dict[str, Any]:
         """Generate comparative analysis and tradeoffs between plans"""
-        raise NotImplementedError("Implementation pending")
+        
+        if not plans:
+            return {
+                "feasibility_summary": "No plans generated",
+                "tradeoffs_analysis": []
+            }
+        
+        # Generate feasibility summary
+        feasibility_counts = {}
+        for plan in plans:
+            feasibility = plan.feasibility.value
+            feasibility_counts[feasibility] = feasibility_counts.get(feasibility, 0) + 1
+        
+        feasibility_summary = f"Generated {len(plans)} plans: "
+        summary_parts = []
+        for feasibility, count in feasibility_counts.items():
+            summary_parts.append(f"{count} {feasibility.replace('_', ' ')}")
+        feasibility_summary += ", ".join(summary_parts)
+        
+        # Generate tradeoffs analysis
+        tradeoffs = []
+        
+        # Unit count tradeoffs
+        unit_counts = [p.total_units for p in plans]
+        min_units, max_units = min(unit_counts), max(unit_counts)
+        if max_units > min_units:
+            tradeoffs.append(f"Unit count ranges from {min_units} to {max_units} - higher density requires more variances")
+        
+        # Affordability tradeoffs
+        affordability_pcts = [p.affordable_percentage for p in plans if p.affordable_percentage]
+        if affordability_pcts:
+            min_afford, max_afford = min(affordability_pcts), max(affordability_pcts)
+            if max_afford > min_afford:
+                tradeoffs.append(f"Affordability ranges from {min_afford:.0%} to {max_afford:.0%} - higher affordability may need subsidies")
+        
+        # Compliance tradeoffs
+        compliance_scores = [p.compliance_score for p in plans]
+        min_compliance, max_compliance = min(compliance_scores), max(compliance_scores)
+        if max_compliance > min_compliance + 0.1:  # Significant difference
+            tradeoffs.append(f"Compliance varies from {min_compliance:.0%} to {max_compliance:.0%} - high compliance limits development potential")
+        
+        # Plan type tradeoffs
+        plan_types = list(set(p.plan_type.value for p in plans))
+        if len(plan_types) > 2:
+            tradeoffs.append("Conservative plans ensure approval but limit impact; innovative plans maximize benefits but increase risk")
+        
+        # Parking tradeoffs
+        parking_ratios = [p.parking_spaces / p.total_units for p in plans if p.total_units > 0]
+        if parking_ratios:
+            min_parking, max_parking = min(parking_ratios), max(parking_ratios)
+            if max_parking > min_parking + 0.2:  # Significant difference
+                tradeoffs.append("Lower parking supports walkability but may require variances and face community resistance")
+        
+        return {
+            "feasibility_summary": feasibility_summary,
+            "tradeoffs_analysis": tradeoffs
+        }
     
     def _generate_conservative_plan(self, neighborhood, target_metrics, intent, lot_area) -> DevelopmentPlan:
         """Generate conservative plan with minimal risk and high feasibility"""
