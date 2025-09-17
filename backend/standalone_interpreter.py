@@ -1,57 +1,13 @@
+#!/usr/bin/env python3
 """
-Agent 1: Interpreter - Advanced natural language processing for urban planning queries.
-Handles multi-neighborhood detection, comparative analysis, and nuanced intent extraction.
+Standalone Enhanced Interpreter Agent for testing
+Multi-neighborhood detection and comparative analysis capabilities
 """
 
-from crewai import Agent, Task, Crew, LLM
-from crewai_tools import BaseTool
-from typing import Dict, Any, List, Optional
-import json
-import httpx
 import re
+from typing import Dict, List, Any
 from pydantic import BaseModel
 from dataclasses import dataclass
-
-
-class UrbanPlanningTool(BaseTool):
-    """Tool for the interpreter to call our neighborhood APIs"""
-    
-    name: str = "urban_planning_api"
-    description: str = "Get SF neighborhood data, zoning rules, and validate development proposals"
-    
-    def _run(self, action: str, neighborhood: str = None, **kwargs) -> str:
-        """Execute urban planning API calls"""
-        base_url = "http://localhost:8001/api/v1"
-        
-        try:
-            if action == "list_neighborhoods":
-                response = httpx.get(f"{base_url}/neighborhoods/")
-                
-            elif action == "get_zoning" and neighborhood:
-                response = httpx.get(f"{base_url}/neighborhoods/{neighborhood}/zoning")
-                
-            elif action == "validate_proposal" and neighborhood:
-                proposal_data = {
-                    "far": kwargs.get("far", 1.0),
-                    "height_ft": kwargs.get("height_ft", 40),
-                    "lot_area_sf": kwargs.get("lot_area_sf", 2500),
-                    "num_units": kwargs.get("num_units", 1)
-                }
-                response = httpx.post(
-                    f"{base_url}/neighborhoods/{neighborhood}/validate-proposal",
-                    json=proposal_data
-                )
-            else:
-                return json.dumps({"error": "Invalid action or missing neighborhood"})
-            
-            if response.status_code == 200:
-                return json.dumps(response.json(), indent=2)
-            else:
-                return json.dumps({"error": f"API call failed: {response.status_code}"})
-                
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
 
 @dataclass
 class NeighborhoodProfile:
@@ -80,10 +36,9 @@ class PlanningParameters(BaseModel):
     specific_elements: List[str] = []  # bike infrastructure, businesses, etc.
     confidence: float = 0.8  # Interpretation confidence
 
-
-class InterpreterAgent:
+class StandaloneInterpreterAgent:
     """
-    Agent 1: Advanced natural language interpretation for urban planning queries.
+    Standalone Enhanced Interpreter Agent for testing
     
     Capabilities:
     - Multi-neighborhood detection and comparison
@@ -93,44 +48,13 @@ class InterpreterAgent:
     - Context-aware confidence scoring
     """
     
-    def __init__(self, openai_api_key: str = None):
-        self.urban_tool = UrbanPlanningTool()
-        self.openai_api_key = openai_api_key
+    def __init__(self):
         self.neighborhood_profiles = self._load_neighborhood_profiles()
         self.comparison_indicators = [
             'vs', 'versus', 'compared to', 'compare', 'difference between',
             'how does', 'impact on', 'affect', 'between', 'and', 'both'
         ]
         
-        # Initialize agent only if API key provided
-        if openai_api_key:
-            self.llm = LLM(
-                model="gpt-4o-mini",
-                api_key=openai_api_key,
-                temperature=0.1
-            )
-            # Create the enhanced agent
-            self.agent = Agent(
-                role='Advanced Urban Planning Interpreter',
-                goal='Convert complex natural language urban planning queries into structured parameters, handling multi-neighborhood comparisons and nuanced business impact analysis',
-                backstory="""You are a senior urban planning consultant specializing in San Francisco neighborhoods. 
-                You have deep expertise in:
-                - SF zoning codes (RH-1, NCT-3, NCT-4) and their implications
-                - Neighborhood business ecosystems (Marina's affluent retail vs Mission's community businesses)
-                - Transportation infrastructure impacts on different demographics
-                - Comparative analysis between neighborhoods with different characteristics
-                - Business impact modeling for infrastructure changes
-                
-                You excel at understanding nuanced queries like "how would bike infrastructure affect businesses in Marina vs Mission" 
-                and extracting the comparative intent, specific elements (bike infrastructure, business impact), 
-                and neighborhood-specific considerations.""",
-                tools=[self.urban_tool],
-                llm=self.llm,
-                verbose=True
-            )
-        else:
-            self.agent = None
-    
     def _load_neighborhood_profiles(self) -> Dict[str, NeighborhoodProfile]:
         """Load detailed neighborhood profiles for contextual analysis"""
         return {
@@ -257,76 +181,10 @@ class InterpreterAgent:
 
     def interpret_query(self, user_query: str) -> PlanningParameters:
         """Convert natural language query to structured planning parameters with enhanced capabilities"""
-        
-        # If we have an AI agent, use it for advanced interpretation
-        if self.agent:
-            return self._ai_interpret_query(user_query)
-        else:
-            # Use rule-based interpretation as fallback
-            return self._rule_based_interpret_query(user_query)
-    
-    def _ai_interpret_query(self, user_query: str) -> PlanningParameters:
-        """AI-powered interpretation using CrewAI agent"""
-        
-        task = Task(
-            description=f"""
-            Analyze this complex urban planning query and convert it to structured parameters:
-            
-            USER QUERY: "{user_query}"
-            
-            Your enhanced analysis should:
-            1. Detect ALL neighborhoods mentioned (Marina, Mission, Hayes Valley) - may be multiple
-            2. Determine if this is a COMPARATIVE query (e.g., "Marina vs Mission", "how does X affect Y in both neighborhoods")
-            3. Extract specific elements (bike infrastructure, business impact, transit, housing, etc.)
-            4. Understand nuanced intent beyond keywords:
-               - "business_impact" if asking about effects on businesses/economy
-               - "mobility" if about transportation/bike infrastructure
-               - "housing_development" if about housing
-               - "environmental" if about parks/climate
-               - "equity" if about displacement/gentrification
-            5. Determine priority (equity, transit, environmental, economic, balanced)
-            6. Calculate confidence based on query specificity
-            
-            For business impact queries, consider:
-            - Marina: affluent retail, car-dependent shoppers, high-end boutiques
-            - Mission: community businesses, Latino corner stores, walkable customers
-            - Hayes Valley: pedestrian-oriented, design studios, young professionals
-            
-            Return ONLY a JSON object with these exact fields:
-            - neighborhoods: [list of neighborhood names - may be multiple]
-            - intent: (business_impact, mobility, housing_development, environmental, equity, mixed_planning)
-            - priority: (equity, transit, environmental, economic, balanced)
-            - focus: (business_ecosystem, accessibility, affordability, sustainability, comprehensive)
-            - constraints: [list of constraint strings from neighborhood characteristics]
-            - target_metrics: {{dict with any specific numbers mentioned}}
-            - spatial_focus: (near_transit, waterfront, cultural_district, general)
-            - comparative: (true if comparing neighborhoods, false otherwise)
-            - specific_elements: [list of specific elements: bike_infrastructure, business_impact, etc.]
-            - confidence: (0.0-1.0 based on query clarity and specificity)
-            """,
-            agent=self.agent,
-            expected_output="JSON object with enhanced structured planning parameters"
-        )
-        
-        # Execute the task
-        crew = Crew(agents=[self.agent], tasks=[task])
-        result = crew.kickoff()
-        
-        try:
-            # Parse the result JSON
-            if isinstance(result, str):
-                parsed_result = json.loads(result.strip('```json').strip('```').strip())
-            else:
-                parsed_result = result
-            
-            return PlanningParameters(**parsed_result)
-            
-        except Exception as e:
-            # Fallback parsing for robust operation
-            return self._rule_based_interpret_query(user_query)
+        return self._rule_based_interpret_query(user_query)
     
     def _rule_based_interpret_query(self, user_query: str) -> PlanningParameters:
-        """Rule-based interpretation as fallback when AI agent is not available"""
+        """Rule-based interpretation with advanced pattern matching"""
         
         # 1. Detect neighborhoods
         neighborhoods = self.detect_neighborhoods(user_query)
@@ -433,33 +291,47 @@ class InterpreterAgent:
             base_confidence += 0.15
         
         return min(0.95, base_confidence)
+
+def test_interpreter():
+    """Test the enhanced interpreter with comparative queries"""
     
-
-
-# Example usage and testing
-if __name__ == "__main__":
-    # Test the enhanced interpreter
-    interpreter = InterpreterAgent()
+    interpreter = StandaloneInterpreterAgent()
     
     test_queries = [
         "Add affordable housing near BART in Hayes Valley",
         "How would more bike infrastructure affect businesses in the Marina vs the Mission?",
-        "Compare walkability improvements between Marina and Mission",
+        "Compare walkability improvements between Marina and Mission", 
         "What's the impact of bike lanes on local businesses in both neighborhoods?",
         "Make the Marina more walkable while respecting flood risks",
-        "Increase density in Mission without displacing existing residents"
+        "Increase density in Mission without displacing existing residents",
+        "How do bike lanes affect businesses in Marina compared to Mission?",
+        "Bike infrastructure impact on businesses in both Marina and Mission"
     ]
     
-    for query in test_queries:
-        print(f"\n{'='*60}")
-        print(f"Query: {query}")
-        print(f"{'='*60}")
+    print("🧠 Testing Enhanced Interpreter Agent")
+    print("=" * 70)
+    
+    for i, query in enumerate(test_queries, 1):
+        print(f"\n📝 Test {i}: {query}")
+        print("-" * 50)
+        
         result = interpreter.interpret_query(query)
-        print(f"Neighborhoods: {result.neighborhoods}")
-        print(f"Intent: {result.intent}")
-        print(f"Priority: {result.priority}")
-        print(f"Focus: {result.focus}")
-        print(f"Comparative: {result.comparative}")
-        print(f"Elements: {result.specific_elements}")
-        print(f"Confidence: {result.confidence:.2f}")
-        print(f"Constraints: {result.constraints}")
+        
+        print(f"🏘️  Neighborhoods: {result.neighborhoods}")
+        print(f"🎯 Intent: {result.intent}")
+        print(f"⭐ Priority: {result.priority}")
+        print(f"🔍 Focus: {result.focus}")
+        print(f"🔄 Comparative: {result.comparative}")
+        print(f"🔧 Elements: {result.specific_elements}")
+        print(f"📊 Confidence: {result.confidence:.2f}")
+        print(f"⚠️  Constraints: {result.constraints[:3]}...")  # Show first 3 constraints
+        
+        # Special analysis for comparative queries
+        if result.comparative and len(result.neighborhoods) > 1:
+            print(f"✨ COMPARATIVE ANALYSIS DETECTED!")
+            print(f"   Comparing: {' vs '.join(result.neighborhoods)}")
+            if "business_impact" in result.specific_elements:
+                print(f"   Business focus: Marina (affluent retail) vs Mission (community businesses)")
+
+if __name__ == "__main__":
+    test_interpreter()

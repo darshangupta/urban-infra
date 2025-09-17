@@ -13,11 +13,11 @@ interface QueryInputProps {
 }
 
 const EXAMPLE_QUERIES = [
-  "Add 200 affordable housing units near BART in Hayes Valley",
+  "What if it became 10 degrees colder? How would that affect Mission vs Hayes vs Marina?",
+  "How would more bike infrastructure affect businesses in the Marina vs the Mission?",
   "Make the Marina District more walkable while protecting from flooding", 
   "Increase density in Mission without displacing residents",
-  "What are the tradeoffs for transit-oriented housing in Hayes Valley?",
-  "How would bike infrastructure affect the Mission District community?"
+  "What are the tradeoffs for transit-oriented housing in Hayes Valley?"
 ];
 
 export function QueryInput({ onSubmit, isLoading = false }: QueryInputProps) {
@@ -35,13 +35,13 @@ export function QueryInput({ onSubmit, isLoading = false }: QueryInputProps) {
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Search className="h-6 w-6 text-blue-600" />
+        <CardTitle className="flex items-center gap-2 text-foreground">
+          <Search className="h-6 w-6 text-blue-600 dark:text-blue-400 transition-colors duration-300" />
           Urban Planning Analysis
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-foreground/80">
           Ask questions about housing, development, and urban planning in San Francisco neighborhoods.
           Get comprehensive impact analysis powered by AI.
         </CardDescription>
@@ -59,7 +59,7 @@ export function QueryInput({ onSubmit, isLoading = false }: QueryInputProps) {
           <Button 
             type="submit" 
             disabled={!query.trim() || isLoading}
-            className="px-6"
+            className="px-6 transition-all duration-300 hover:scale-105 hover:shadow-lg"
           >
             {isLoading ? (
               <>
@@ -76,7 +76,7 @@ export function QueryInput({ onSubmit, isLoading = false }: QueryInputProps) {
         </form>
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-foreground/60">
             <Lightbulb className="h-4 w-4" />
             Try these example queries:
           </div>
@@ -85,7 +85,7 @@ export function QueryInput({ onSubmit, isLoading = false }: QueryInputProps) {
               <Badge
                 key={index}
                 variant="secondary"
-                className="cursor-pointer hover:bg-secondary/80 transition-colors px-3 py-1 text-xs"
+                className="cursor-pointer hover:bg-secondary/80 hover:scale-105 transition-all duration-300 hover:shadow-md px-3 py-1 text-xs"
                 onClick={() => handleExampleClick(example)}
               >
                 {example}

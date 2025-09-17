@@ -36,13 +36,66 @@ export interface PlanningAlternative {
   amenities: string[];
 }
 
+export interface QueryIntent {
+  type: string;
+  priority: string;
+  density: string;
+  focus: string;
+  confidence: number;
+}
+
 export interface AnalysisResult {
   query: string;
   neighborhood: string;
+  intent: QueryIntent;
   alternatives: PlanningAlternative[];
   recommended: string;
   rationale: string;
   impact: ComprehensiveImpact;
+}
+
+// New Exploratory Canvas Types
+export interface ExploratoryDimension {
+  title: string;
+  description: string;
+  metrics: Record<string, any>;
+  insights: string[];
+  follow_up_questions: string[];
+}
+
+export interface NeighborhoodAnalysis {
+  neighborhood: string;
+  characteristics: Record<string, string>;
+  impact_analysis: Record<string, ExploratoryDimension>;
+  vulnerability_factors: string[];
+  adaptation_strategies: string[];
+}
+
+export interface ScenarioBranch {
+  scenario_name: string;
+  description: string;
+  probability: string;
+  consequences: string[];
+  related_factors: string[];
+}
+
+export interface QueryContext {
+  query_type: string;
+  exploration_mode: string;
+  neighborhoods: string[];
+  primary_domain: string;
+  confidence: number;
+  suggested_explorations: string[];
+}
+
+export interface ExploratoryCanvasResult {
+  query: string;
+  context: QueryContext;
+  neighborhood_analyses: NeighborhoodAnalysis[];
+  comparative_insights?: Record<string, any>;
+  scenario_branches?: ScenarioBranch[];
+  exploration_suggestions: string[];
+  related_questions: string[];
 }
 
 // API client class
@@ -67,6 +120,25 @@ export class UrbanPlanningAPI {
 
     if (!response.ok) {
       throw new Error(`Analysis failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * NEW: Exploratory canvas endpoint - generates open-ended exploration
+   */
+  async exploreQuery(query: string): Promise<ExploratoryCanvasResult> {
+    const response = await fetch(`${this.baseUrl}/api/v1/explore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Exploration failed: ${response.statusText}`);
     }
 
     return response.json();

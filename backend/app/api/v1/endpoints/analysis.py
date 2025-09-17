@@ -1,6 +1,6 @@
 import asyncio
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Union
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -9,42 +9,48 @@ router = APIRouter(tags=["analysis"])
 class PlanAnalysisRequest(BaseModel):
     query: str
 
-class PlanningAlternative(BaseModel):
+class ExploratoryDimension(BaseModel):
+    """Individual dimension of analysis (e.g., environmental, economic)"""
     title: str
-    type: str
     description: str
-    units: int
-    affordable_percentage: int
-    height_ft: int
-    amenities: List[str]
+    metrics: Dict[str, Any]
+    insights: List[str]
+    follow_up_questions: List[str]
 
-class ImpactMetric(BaseModel):
-    before: float
-    after: float
-    unit: str
-    confidence: float
-
-class CategoryImpact(BaseModel):
-    metrics: Dict[str, ImpactMetric]
-    benefits: List[str]
-    concerns: List[str]
-    mitigation_strategies: List[str]
-
-class ComprehensiveImpact(BaseModel):
-    housing: CategoryImpact
-    accessibility: CategoryImpact
-    equity: CategoryImpact
-    economic: CategoryImpact
-    environmental: CategoryImpact
-    overall_assessment: str
-
-class AnalysisResponse(BaseModel):
-    query: str
+class NeighborhoodAnalysis(BaseModel):
+    """Analysis for a specific neighborhood"""
     neighborhood: str
-    alternatives: List[PlanningAlternative]
-    recommended: str
-    rationale: str
-    impact: ComprehensiveImpact
+    characteristics: Dict[str, str]
+    impact_analysis: Dict[str, ExploratoryDimension]
+    vulnerability_factors: List[str]
+    adaptation_strategies: List[str]
+
+class ScenarioBranch(BaseModel):
+    """Branching scenario for what-if analysis"""
+    scenario_name: str
+    description: str
+    probability: str
+    consequences: List[str]
+    related_factors: List[str]
+
+class QueryContext(BaseModel):
+    """Enhanced query understanding"""
+    query_type: str  # analytical, comparative, scenario_planning, solution_seeking
+    exploration_mode: str  # impact_analysis, comparison, scenario_tree, solution_space
+    neighborhoods: List[str]
+    primary_domain: str  # climate, economics, housing, transportation, etc.
+    confidence: float
+    suggested_explorations: List[str]
+
+class ExploratoryCanvas(BaseModel):
+    """New exploratory response format"""
+    query: str
+    context: QueryContext
+    neighborhood_analyses: List[NeighborhoodAnalysis]
+    comparative_insights: Optional[Dict[str, Any]] = None
+    scenario_branches: Optional[List[ScenarioBranch]] = None
+    exploration_suggestions: List[str]
+    related_questions: List[str]
 
 # SF-specific street and landmark data
 SF_STREET_DATA = {
@@ -68,8 +74,548 @@ SF_STREET_DATA = {
     }
 }
 
+def analyze_query_context(query: str) -> QueryContext:
+    """Advanced query analysis for exploratory canvas approach"""
+    query_lower = query.lower()
+    
+    # Detect query type
+    query_type = "analytical"  # default
+    exploration_mode = "impact_analysis"
+    
+    # Query type detection
+    if any(word in query_lower for word in ["what if", "if it", "became", "changed", "increased", "decreased"]):
+        query_type = "scenario_planning"
+        exploration_mode = "scenario_tree"
+    elif any(word in query_lower for word in ["vs", "versus", "compared to", "compare", "difference between"]):
+        query_type = "comparative"
+        exploration_mode = "comparison"
+    elif any(word in query_lower for word in ["how to", "should we", "best way", "recommend", "solution"]):
+        query_type = "solution_seeking"
+        exploration_mode = "solution_space"
+    elif any(word in query_lower for word in ["how would", "what would", "impact", "affect", "influence"]):
+        query_type = "analytical"
+        exploration_mode = "impact_analysis"
+    
+    # Neighborhood detection (support multiple)
+    neighborhoods = []
+    neighborhood_patterns = {
+        "marina": ["marina", "palace of fine arts", "chestnut street", "union street", "crissy field"],
+        "mission": ["mission", "valencia", "16th street", "24th street", "mission dolores"],
+        "hayes_valley": ["hayes", "patricia", "grove street", "fell street", "sf jazz"]
+    }
+    
+    for neighborhood, patterns in neighborhood_patterns.items():
+        if any(pattern in query_lower for pattern in patterns):
+            neighborhoods.append(neighborhood)
+    
+    if not neighborhoods:
+        neighborhoods = ["hayes_valley"]  # default
+    
+    # Primary domain detection
+    primary_domain = "general"
+    domain_patterns = {
+        "climate": ["climate", "temperature", "weather", "cold", "hot", "rain", "flood", "degrees"],
+        "transportation": ["bike", "transit", "bart", "muni", "street", "traffic", "parking"],
+        "housing": ["housing", "apartments", "units", "affordable", "development"],
+        "economics": ["business", "economy", "economic", "revenue", "cost", "jobs"],
+        "environment": ["environment", "green", "park", "pollution", "air quality", "sustainability"]
+    }
+    
+    for domain, patterns in domain_patterns.items():
+        if any(pattern in query_lower for pattern in patterns):
+            primary_domain = domain
+            break
+    
+    # Generate exploration suggestions
+    suggested_explorations = generate_exploration_suggestions(query_type, primary_domain, neighborhoods)
+    
+    # Calculate confidence
+    confidence = calculate_analysis_confidence(query, query_type, neighborhoods, primary_domain)
+    
+    return QueryContext(
+        query_type=query_type,
+        exploration_mode=exploration_mode,
+        neighborhoods=neighborhoods,
+        primary_domain=primary_domain,
+        confidence=confidence,
+        suggested_explorations=suggested_explorations
+    )
+
+def generate_exploration_suggestions(query_type: str, domain: str, neighborhoods: List[str]) -> List[str]:
+    """Generate contextual exploration suggestions"""
+    suggestions = []
+    
+    if query_type == "scenario_planning":
+        suggestions.extend([
+            f"Explore secondary effects across {len(neighborhoods)} neighborhoods",
+            f"Analyze adaptation strategies for {domain} changes",
+            "Consider long-term vs short-term impacts",
+            "Examine vulnerable population effects"
+        ])
+    elif query_type == "comparative":
+        suggestions.extend([
+            "Deep dive into neighborhood characteristics",
+            "Explore historical precedents",
+            "Analyze demographic differences",
+            "Consider implementation feasibility"
+        ])
+    elif query_type == "analytical":
+        suggestions.extend([
+            "Quantify impact magnitude",
+            "Identify key stakeholders affected",
+            "Explore mitigation strategies",
+            "Consider unintended consequences"
+        ])
+    
+    return suggestions
+
+def calculate_analysis_confidence(query: str, query_type: str, neighborhoods: List[str], domain: str) -> float:
+    """Calculate confidence in query interpretation"""
+    base_confidence = 0.6
+    
+    # Query specificity
+    if len(query.split()) > 8:
+        base_confidence += 0.1
+    
+    # Clear domain identification
+    if domain != "general":
+        base_confidence += 0.15
+    
+    # Neighborhood specificity
+    if len(neighborhoods) == 1:
+        base_confidence += 0.1
+    elif len(neighborhoods) > 1:
+        base_confidence += 0.15  # Multi-neighborhood queries are often more specific
+    
+    return min(0.95, base_confidence)
+
+def generate_exploratory_content(context: QueryContext, query: str) -> ExploratoryCanvas:
+    """Generate exploratory canvas based on query context"""
+    
+    # Generate neighborhood analyses
+    neighborhood_analyses = []
+    for neighborhood in context.neighborhoods:
+        analysis = generate_neighborhood_analysis(neighborhood, context, query)
+        neighborhood_analyses.append(analysis)
+    
+    # Generate comparative insights if multiple neighborhoods
+    comparative_insights = None
+    if len(context.neighborhoods) > 1:
+        comparative_insights = generate_comparative_insights(context.neighborhoods, context.primary_domain)
+    
+    # Generate scenario branches for what-if queries
+    scenario_branches = None
+    if context.query_type == "scenario_planning":
+        scenario_branches = generate_scenario_branches(query, context)
+    
+    # Generate exploration suggestions
+    exploration_suggestions = generate_dynamic_explorations(context, query)
+    
+    # Generate related questions
+    related_questions = generate_related_questions(context, query)
+    
+    return ExploratoryCanvas(
+        query=query,
+        context=context,
+        neighborhood_analyses=neighborhood_analyses,
+        comparative_insights=comparative_insights,
+        scenario_branches=scenario_branches,
+        exploration_suggestions=exploration_suggestions,
+        related_questions=related_questions
+    )
+
+def generate_neighborhood_analysis(neighborhood: str, context: QueryContext, query: str) -> NeighborhoodAnalysis:
+    """Generate analysis for a specific neighborhood"""
+    
+    # Get neighborhood data
+    neighborhood_data = SF_STREET_DATA.get(neighborhood, SF_STREET_DATA["hayes_valley"])
+    
+    # Generate characteristics
+    characteristics = {
+        "primary_character": get_neighborhood_character(neighborhood),
+        "zoning": neighborhood_data["zoning"],
+        "main_streets": ", ".join(neighborhood_data["main_streets"][:2]),
+        "key_landmarks": ", ".join(neighborhood_data["landmarks"][:2]),
+        "transit_access": neighborhood_data["transport"][0] if neighborhood_data["transport"] else "Limited"
+    }
+    
+    # Generate impact analysis dimensions
+    impact_analysis = {}
+    
+    if context.primary_domain == "climate":
+        impact_analysis = generate_climate_impact_analysis(neighborhood, query)
+    elif context.primary_domain == "transportation":
+        impact_analysis = generate_transportation_impact_analysis(neighborhood, query)
+    elif context.primary_domain == "economics":
+        impact_analysis = generate_economic_impact_analysis(neighborhood, query)
+    else:
+        impact_analysis = generate_general_impact_analysis(neighborhood, query)
+    
+    # Generate vulnerability factors and adaptation strategies
+    vulnerability_factors = get_neighborhood_vulnerabilities(neighborhood, context.primary_domain)
+    adaptation_strategies = get_adaptation_strategies(neighborhood, context.primary_domain)
+    
+    return NeighborhoodAnalysis(
+        neighborhood=neighborhood,
+        characteristics=characteristics,
+        impact_analysis=impact_analysis,
+        vulnerability_factors=vulnerability_factors,
+        adaptation_strategies=adaptation_strategies
+    )
+
+def get_neighborhood_character(neighborhood: str) -> str:
+    """Get neighborhood character description"""
+    characters = {
+        "marina": "Affluent, low-density, car-dependent waterfront district",
+        "mission": "Dense, diverse, walkable cultural hub with gentrification pressure",
+        "hayes_valley": "Transit-rich, recently gentrified, mixed-use neighborhood"
+    }
+    return characters.get(neighborhood, "Mixed urban neighborhood")
+
+def generate_climate_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
+    """Generate climate-specific impact analysis for '10 degrees colder' type queries"""
+    
+    # Extract temperature change if specified
+    temperature_change = extract_temperature_change(query)
+    
+    if neighborhood == "marina":
+        return {
+            "environmental": ExploratoryDimension(
+                title="Environmental Vulnerability",
+                description=f"Marina's waterfront location amplifies climate impacts",
+                metrics={
+                    "flood_risk_increase": "25-40% higher with storm intensity",
+                    "heating_demand": f"+{abs(temperature_change * 8)}% energy consumption",
+                    "fog_pattern_shift": "Increased marine layer persistence"
+                },
+                insights=[
+                    "Waterfront buildings face increased flood risk from storm surge",
+                    "Higher heating costs disproportionately affect fixed-income residents",
+                    "Marina Green becomes less usable for outdoor activities"
+                ],
+                follow_up_questions=[
+                    "How would flood insurance costs change?",
+                    "What weatherization programs exist?",
+                    "Could Marina Green need covered facilities?"
+                ]
+            ),
+            "housing": ExploratoryDimension(
+                title="Housing & Infrastructure",
+                description="Building systems and housing costs under temperature stress",
+                metrics={
+                    "heating_cost_increase": f"{temperature_change * 12}% of household income impact",
+                    "building_stress": "1950s-70s housing stock vulnerable",
+                    "utility_demand": f"+{abs(temperature_change * 15)}% peak energy load"
+                },
+                insights=[
+                    "Older Marina buildings lack efficient heating systems",
+                    "Rent burden increases as utilities rise",
+                    "Infrastructure strain during cold snaps"
+                ],
+                follow_up_questions=[
+                    "Which buildings need retrofitting priority?",
+                    "How do utility subsidies work?",
+                    "What emergency warming centers exist?"
+                ]
+            ),
+            "economic": ExploratoryDimension(
+                title="Business & Economic Impact",
+                description="Commercial district response to sustained colder weather",
+                metrics={
+                    "outdoor_dining_loss": f"{abs(temperature_change * 20)}% revenue decline",
+                    "tourism_impact": "15-25% visitor reduction",
+                    "retail_pattern_shift": "Indoor vs outdoor activity preference"
+                },
+                insights=[
+                    "Restaurant patios become unusable more often",
+                    "Palace of Fine Arts tourism drops significantly",
+                    "Fitness studios may see increased indoor demand"
+                ],
+                follow_up_questions=[
+                    "How could businesses adapt outdoor spaces?",
+                    "What tourism substitutes might emerge?",
+                    "Do heating subsidies exist for small businesses?"
+                ]
+            )
+        }
+    
+    elif neighborhood == "mission":
+        return {
+            "environmental": ExploratoryDimension(
+                title="Environmental Justice Impact",
+                description="Climate burden on diverse, working-class community",
+                metrics={
+                    "air_quality_change": "Increased heating emissions in dense area",
+                    "urban_heat_loss": "Reduced summer relief, increased winter exposure",
+                    "green_space_stress": "Parks less usable, community gardens affected"
+                },
+                insights=[
+                    "Dense housing means heating inefficiencies compound",
+                    "Limited green space reduces climate resilience",
+                    "Air quality degrades with increased heating"
+                ],
+                follow_up_questions=[
+                    "How would air quality monitoring change?",
+                    "Could community gardens adapt to cold?",
+                    "What about outdoor community events?"
+                ]
+            ),
+            "housing": ExploratoryDimension(
+                title="Housing Burden & Displacement",
+                description="Temperature change impact on vulnerable residents",
+                metrics={
+                    "utility_burden": f"+{abs(temperature_change * 15)}% of income for low-income households",
+                    "displacement_pressure": "Higher costs force migration",
+                    "overcrowding_increase": "Families consolidate to share heating costs"
+                },
+                insights=[
+                    "Many Mission residents already energy-burdened",
+                    "Older housing stock poorly insulated",
+                    "Cold weather exacerbates displacement pressure"
+                ],
+                follow_up_questions=[
+                    "What tenant protections exist for utility costs?",
+                    "How effective are weatherization programs?",
+                    "Are there emergency heating assistance programs?"
+                ]
+            ),
+            "community": ExploratoryDimension(
+                title="Community & Cultural Impact",
+                description="Effect on Mission's vibrant street life and culture",
+                metrics={
+                    "street_activity_decline": f"{abs(temperature_change * 25)}% reduction in outdoor gathering",
+                    "business_revenue_impact": "Corner stores, restaurants see decline",
+                    "cultural_event_disruption": "Outdoor murals, festivals affected"
+                },
+                insights=[
+                    "Mission's street culture depends on walkable weather",
+                    "Cultural events may need indoor alternatives",
+                    "Community cohesion could be affected by weather isolation"
+                ],
+                follow_up_questions=[
+                    "How could outdoor cultural events adapt?",
+                    "What indoor community spaces exist?",
+                    "Would this change the neighborhood's character?"
+                ]
+            )
+        }
+    
+    else:  # hayes_valley
+        return {
+            "environmental": ExploratoryDimension(
+                title="Transit & Walkability Impact",
+                description="Effects on Hayes Valley's pedestrian-oriented character",
+                metrics={
+                    "walking_comfort_decline": f"{abs(temperature_change * 18)}% reduction in comfortable walking weather",
+                    "transit_disruption": "Weather-related delays increase",
+                    "outdoor_space_usage": "Patricia's Green, plazas less utilized"
+                },
+                insights=[
+                    "Hayes Valley's walkability advantage diminishes",
+                    "Transit-oriented lifestyle becomes less appealing",
+                    "Outdoor dining and plaza culture affected"
+                ],
+                follow_up_questions=[
+                    "How weather-resistant is BART access?",
+                    "Could covered walkways be added?",
+                    "What indoor alternatives exist for plaza activities?"
+                ]
+            )
+        }
+
+def extract_temperature_change(query: str) -> int:
+    """Extract temperature change from query"""
+    import re
+    
+    # Look for patterns like "10 degrees colder", "5 degrees warmer"
+    pattern = r'(\d+)\s*degrees?\s*(colder|cooler|warmer|hotter)'
+    match = re.search(pattern, query.lower())
+    
+    if match:
+        degrees = int(match.group(1))
+        direction = match.group(2)
+        return -degrees if direction in ['colder', 'cooler'] else degrees
+    
+    return -10  # default for "colder" queries
+
+def generate_transportation_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
+    """Generate transportation-focused impact analysis"""
+    return {
+        "mobility": ExploratoryDimension(
+            title="Transportation Impact",
+            description=f"Transportation effects in {neighborhood}",
+            metrics={"placeholder": "Transportation analysis"},
+            insights=[f"Transportation impacts vary by {neighborhood} characteristics"],
+            follow_up_questions=["How would this affect commuting patterns?"]
+        )
+    }
+
+def generate_economic_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
+    """Generate economics-focused impact analysis"""
+    return {
+        "economic": ExploratoryDimension(
+            title="Economic Impact",
+            description=f"Economic effects in {neighborhood}",
+            metrics={"placeholder": "Economic analysis"},
+            insights=[f"Economic impacts depend on {neighborhood} business ecosystem"],
+            follow_up_questions=["How would this affect local businesses?"]
+        )
+    }
+
+def generate_general_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
+    """Generate general impact analysis"""
+    return {
+        "general": ExploratoryDimension(
+            title="General Impact",
+            description=f"General effects in {neighborhood}",
+            metrics={"placeholder": "General analysis"},
+            insights=[f"Multiple factors affect {neighborhood}"],
+            follow_up_questions=["What are the primary concerns?"]
+        )
+    }
+
+def get_neighborhood_vulnerabilities(neighborhood: str, domain: str) -> List[str]:
+    """Get neighborhood-specific vulnerability factors"""
+    base_vulnerabilities = {
+        "marina": ["Flood risk", "Car dependency", "Aging infrastructure", "High cost burden"],
+        "mission": ["Displacement pressure", "Overcrowding", "Limited green space", "Air quality"],
+        "hayes_valley": ["Transit dependency", "Small lot constraints", "Gentrification pressure"]
+    }
+    
+    vulnerabilities = base_vulnerabilities.get(neighborhood, ["General urban challenges"])
+    
+    if domain == "climate":
+        climate_vulnerabilities = {
+            "marina": ["Waterfront exposure", "Sea level rise", "Storm surge"],
+            "mission": ["Urban heat island", "Dense development", "Limited cooling"],
+            "hayes_valley": ["Limited green infrastructure", "Transit exposure"]
+        }
+        vulnerabilities.extend(climate_vulnerabilities.get(neighborhood, []))
+    
+    return vulnerabilities
+
+def get_adaptation_strategies(neighborhood: str, domain: str) -> List[str]:
+    """Get neighborhood-specific adaptation strategies"""
+    base_strategies = {
+        "marina": ["Flood barriers", "Building retrofits", "Emergency planning"],
+        "mission": ["Community resilience hubs", "Affordable weatherization", "Green infrastructure"],
+        "hayes_valley": ["Transit improvements", "Covered walkways", "Public space enhancement"]
+    }
+    
+    return base_strategies.get(neighborhood, ["General adaptation measures"])
+
+def generate_comparative_insights(neighborhoods: List[str], domain: str) -> Dict[str, Any]:
+    """Generate insights comparing multiple neighborhoods"""
+    return {
+        "vulnerability_ranking": f"Relative vulnerability across {', '.join(neighborhoods)}",
+        "adaptation_costs": "Comparative implementation costs and feasibility",
+        "equity_implications": "How impacts differ across socioeconomic lines",
+        "coordination_opportunities": "Cross-neighborhood collaboration potential"
+    }
+
+def generate_scenario_branches(query: str, context: QueryContext) -> List[ScenarioBranch]:
+    """Generate scenario branches for what-if queries"""
+    
+    if "10 degrees colder" in query.lower() or "colder" in query.lower():
+        return [
+            ScenarioBranch(
+                scenario_name="Immediate Response (0-6 months)",
+                description="Short-term emergency and adaptation measures",
+                probability="Highly likely",
+                consequences=[
+                    "Emergency heating assistance programs activated",
+                    "Outdoor dining and events curtailed",
+                    "Public facility usage patterns shift indoors"
+                ],
+                related_factors=["Energy grid capacity", "Emergency services", "Public health"]
+            ),
+            ScenarioBranch(
+                scenario_name="Medium-term Adaptation (6 months - 2 years)",
+                description="Infrastructure and policy adjustments",
+                probability="Likely with planning",
+                consequences=[
+                    "Building weatherization programs expanded",
+                    "Utility assistance programs increased",
+                    "Outdoor space design modifications"
+                ],
+                related_factors=["Funding availability", "Political will", "Community organization"]
+            ),
+            ScenarioBranch(
+                scenario_name="Long-term Transformation (2+ years)",
+                description="Fundamental neighborhood character changes",
+                probability="Possible with sustained change",
+                consequences=[
+                    "Outdoor culture diminishes permanently",
+                    "Business models shift toward indoor focus",
+                    "Population composition changes due to cost burden"
+                ],
+                related_factors=["Climate persistence", "Economic adaptation", "Cultural resilience"]
+            )
+        ]
+    
+    return []
+
+def generate_dynamic_explorations(context: QueryContext, query: str) -> List[str]:
+    """Generate dynamic exploration suggestions based on context"""
+    explorations = []
+    
+    if context.primary_domain == "climate":
+        explorations.extend([
+            "Explore seasonal variation impacts",
+            "Compare with historical weather patterns",
+            "Analyze infrastructure resilience",
+            "Consider vulnerable population effects"
+        ])
+    
+    if len(context.neighborhoods) > 1:
+        explorations.extend([
+            f"Deep dive into {context.neighborhoods[0]} vs {context.neighborhoods[1]} differences",
+            "Explore cross-neighborhood collaboration opportunities",
+            "Analyze resource sharing potential"
+        ])
+    
+    return explorations
+
+def generate_related_questions(context: QueryContext, query: str) -> List[str]:
+    """Generate related questions for further exploration"""
+    questions = []
+    
+    if "colder" in query.lower():
+        questions.extend([
+            "What if it became 20 degrees colder instead?",
+            "How would the same temperature change affect other seasons?",
+            "What if the cold weather lasted for multiple years?",
+            "How do other cities handle similar temperature conditions?"
+        ])
+    
+    if len(context.neighborhoods) > 1:
+        questions.extend([
+            f"How would this affect other SF neighborhoods like SOMA or Richmond?",
+            "What regional coordination would be needed?",
+            "How do these neighborhoods currently share resources?"
+        ])
+    
+    return questions
+
+# NEW EXPLORATORY API ENDPOINT
+@router.post("/explore", response_model=ExploratoryCanvas)
+async def explore_urban_query(request: PlanAnalysisRequest):
+    """NEW: Generate exploratory canvas for complex urban planning queries"""
+    
+    # Simulate analysis time
+    await asyncio.sleep(1.5)
+    
+    # Analyze query context with new sophisticated approach
+    context = analyze_query_context(request.query)
+    
+    # Generate exploratory content based on context
+    canvas = generate_exploratory_content(context, request.query)
+    
+    return canvas
+
+# LEGACY ENDPOINT (for backward compatibility)
 def analyze_query_intent(query: str) -> Dict[str, Any]:
-    """Analyze user query to understand intent and extract parameters."""
+    """LEGACY: Analyze user query to understand intent and extract parameters."""
     query_lower = query.lower()
     
     # Neighborhood detection
@@ -89,49 +635,63 @@ def analyze_query_intent(query: str) -> Dict[str, Any]:
         "focus": "community"
     }
     
-    # Housing intent
-    if any(word in query_lower for word in ["affordable", "low-income", "community housing"]):
-        intent["type"] = "housing"
-        intent["priority"] = "equity"
-        intent["focus"] = "affordability"
-    
-    # Environmental intent  
-    elif any(word in query_lower for word in ["park", "green", "climate", "sustainability", "environment"]):
-        intent["type"] = "environmental"
-        intent["priority"] = "environmental"
-        intent["focus"] = "green_space"
-    
-    # Transit intent
-    elif any(word in query_lower for word in ["transit", "bart", "muni", "transport", "walkable"]):
-        intent["type"] = "transit"
-        intent["priority"] = "transit"
-        intent["focus"] = "mobility"
-    
-    # Business/Economic intent
-    elif any(word in query_lower for word in ["business", "commercial", "retail", "jobs", "economic"]):
-        intent["type"] = "economic"
-        intent["priority"] = "economic"
-        intent["focus"] = "commercial"
-    
-    # Density analysis
-    if any(word in query_lower for word in ["high-rise", "dense", "maximum", "lots of units"]):
-        intent["density"] = "high"
-    elif any(word in query_lower for word in ["low-rise", "small", "townhouse", "preserve character"]):
-        intent["density"] = "low"
+    # Calculate confidence based on keyword matches
+    confidence = 0.7
+    if len([word for word in query_lower.split() if word in ["housing", "development", "zoning", "neighborhood"]]) > 1:
+        confidence += 0.1
+    if neighborhood != "hayes_valley":  # Non-default neighborhood detection
+        confidence += 0.1
     
     return {
         "query": query,
         "neighborhood": neighborhood,
-        "intent": intent
+        "intent": intent,
+        "confidence": min(confidence, 0.95)
+    }
+
+def analyze_query_intent_legacy(query: str) -> Dict[str, Any]:
+    """LEGACY: Analyze user query to understand intent and extract parameters."""
+    query_lower = query.lower()
+    
+    # Neighborhood detection
+    neighborhood = "hayes_valley"  # default
+    if any(word in query_lower for word in ["marina", "palace of fine arts", "chestnut street"]):
+        neighborhood = "marina"
+    elif any(word in query_lower for word in ["mission", "valencia", "16th street", "24th street"]):
+        neighborhood = "mission"
+    elif any(word in query_lower for word in ["hayes", "patricia", "grove street", "fell street"]):
+        neighborhood = "hayes_valley"
+    
+    # Intent analysis
+    intent = {
+        "type": "mixed",
+        "priority": "balanced",
+        "density": "medium", 
+        "focus": "community"
+    }
+    
+    # Calculate confidence based on keyword matches
+    confidence = 0.7
+    if len([word for word in query_lower.split() if word in ["housing", "development", "zoning", "neighborhood"]]) > 1:
+        confidence += 0.1
+    if neighborhood != "hayes_valley":  # Non-default neighborhood detection
+        confidence += 0.1
+    
+    return {
+        "query": query,
+        "neighborhood": neighborhood,
+        "intent": intent,
+        "confidence": min(confidence, 0.95)
     }
 
 def generate_plan_archetypes(intent: Dict[str, Any], neighborhood: str, query: str) -> List[Dict[str, Any]]:
-    """Generate diverse urban planning intervention options beyond just housing."""
-    plan_pool = []
-    query_lower = query.lower()
+    """Generate diverse planning intervention archetypes based on query analysis."""
     
-    # INFRASTRUCTURE & TRANSPORTATION INTERVENTIONS
-    if any(word in query_lower for word in ["street", "transportation", "bike", "walk", "transit", "infrastructure"]):
+    query_lower = query.lower()
+    plan_pool = []
+    
+    # TRANSPORTATION & MOBILITY INTERVENTIONS
+    if any(word in query_lower for word in ["bike", "transit", "walk", "street", "mobility", "transport"]):
         plan_pool.extend([
             {
                 "title": "Complete Streets Transformation",
@@ -293,6 +853,52 @@ def generate_plan_archetypes(intent: Dict[str, Any], neighborhood: str, query: s
         ])
     
     return plan_pool
+
+# Import required models from legacy system
+class PlanningAlternative(BaseModel):
+    title: str
+    type: str
+    description: str
+    units: int
+    affordable_percentage: int
+    height_ft: int
+    amenities: List[str]
+
+class ImpactMetric(BaseModel):
+    before: float
+    after: float
+    unit: str
+    confidence: float
+
+class CategoryImpact(BaseModel):
+    metrics: Dict[str, ImpactMetric]
+    benefits: List[str]
+    concerns: List[str]
+    mitigation_strategies: List[str]
+
+class ComprehensiveImpact(BaseModel):
+    housing: CategoryImpact
+    accessibility: CategoryImpact
+    equity: CategoryImpact
+    economic: CategoryImpact
+    environmental: CategoryImpact
+    overall_assessment: str
+
+class QueryIntent(BaseModel):
+    type: str
+    priority: str
+    density: str
+    focus: str
+    confidence: float
+
+class AnalysisResponse(BaseModel):
+    query: str
+    neighborhood: str
+    intent: QueryIntent
+    alternatives: List[PlanningAlternative]
+    recommended: str
+    rationale: str
+    impact: ComprehensiveImpact
 
 def generate_dynamic_alternatives(analysis: Dict[str, Any]) -> List[PlanningAlternative]:
     """Generate planning alternatives based on query analysis with diverse intervention types."""
@@ -533,6 +1139,13 @@ async def analyze_urban_plan(request: PlanAnalysisRequest):
     return AnalysisResponse(
         query=request.query,
         neighborhood=neighborhood.replace("_", " ").title(),
+        intent=QueryIntent(
+            type=intent["type"],
+            priority=intent["priority"],
+            density=intent["density"],
+            focus=intent["focus"],
+            confidence=analysis["confidence"]
+        ),
         alternatives=alternatives,
         recommended=recommended,
         rationale=rationale,
