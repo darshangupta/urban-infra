@@ -462,24 +462,282 @@ class InterpreterAgent(BaseAgent):
         return (data_score * 0.6 + domain_score * 0.4)
 
 class PlannerAgent(BaseAgent):
-    """Agent 2: Generates feasible scenarios"""
+    """Enhanced Agent 2: Template-driven scenario generation"""
     
     def __init__(self):
-        super().__init__("Planner", "Scenario Generation & Validation")
+        super().__init__("Planner", "Template-Driven Analysis Generation")
     
     async def execute(self, context: AgentContext) -> AgentContext:
-        """Generate planning scenarios based on context"""
-        self.log(f"Generating scenarios for {context.primary_domain} in {context.neighborhoods}")
+        """Generate template-driven analysis based on classification"""
+        classification = context.classification
+        if not classification:
+            self.log("❌ No classification found - cannot generate analysis")
+            return context
+            
+        self.log(f"🎯 Generating analysis for {classification.query_type.value} | {classification.primary_domain.value}")
         
-        # Generate scenarios based on domain
-        scenarios = await self._generate_scenarios(context)
-        context.data["scenarios"] = scenarios
+        # Handle empty neighborhoods gracefully
+        if not classification.neighborhoods:
+            self.log("⚠️ No specific neighborhoods detected - generating general analysis")
+            analysis = await self._generate_general_analysis(context)
+        else:
+            # Generate template-driven analysis
+            analysis = await self._generate_template_analysis(context)
         
-        # Validate scenarios with tools
-        await self._validate_scenarios(context)
+        context.data["template_analysis"] = analysis
+        self.log(f"✅ Generated {len(analysis.get('scenarios', []))} scenarios")
         
         context.reasoning.extend(self.execution_log)
         return context
+    
+    async def _generate_template_analysis(self, context: AgentContext) -> Dict[str, Any]:
+        """Generate template-driven analysis based on classification"""
+        classification = context.classification
+        
+        # Select template based on domain and query type
+        template = self._select_analysis_template(classification)
+        
+        # Generate scenarios for each neighborhood
+        scenarios = []
+        for neighborhood in classification.neighborhoods:
+            scenario = await self._generate_neighborhood_scenario(
+                neighborhood, classification, template, context
+            )
+            scenarios.append(scenario)
+        
+        # Generate comparative analysis if multiple neighborhoods
+        comparative_analysis = {}
+        if classification.comparative and len(classification.neighborhoods) > 1:
+            comparative_analysis = self._generate_comparative_analysis(
+                classification.neighborhoods, classification, context
+            )
+        
+        return {
+            "template_type": template["name"],
+            "scenarios": scenarios,
+            "comparative_analysis": comparative_analysis,
+            "implementation_timeline": self._generate_implementation_timeline(classification),
+            "confidence": classification.confidence
+        }
+    
+    async def _generate_general_analysis(self, context: AgentContext) -> Dict[str, Any]:
+        """Generate general analysis when no specific neighborhoods detected"""
+        classification = context.classification
+        
+        return {
+            "template_type": "general_planning",
+            "scenarios": [{
+                "type": "general_recommendation",
+                "description": f"General {classification.primary_domain.value} planning recommendations",
+                "scope": "citywide",
+                "considerations": [
+                    "Requires neighborhood-specific analysis",
+                    "Consider local context and constraints",
+                    "Engage community stakeholders"
+                ]
+            }],
+            "comparative_analysis": {},
+            "implementation_timeline": {"immediate": "Conduct neighborhood-specific assessment"},
+            "confidence": 0.3  # Low confidence for general analysis
+        }
+    
+    def _select_analysis_template(self, classification: QueryClassification) -> Dict[str, Any]:
+        """Select appropriate analysis template"""
+        templates = {
+            ("transportation", "comparative"): {
+                "name": "transportation_comparative",
+                "focus": "mobility_impact_comparison",
+                "metrics": ["accessibility", "congestion", "business_impact"],
+                "scenarios": ["current_state", "proposed_changes", "alternatives"]
+            },
+            ("transportation", "scenario_planning"): {
+                "name": "transportation_scenario",
+                "focus": "traffic_impact_analysis", 
+                "metrics": ["vehicle_counts", "parking_demand", "air_quality"],
+                "scenarios": ["baseline", "implementation", "long_term"]
+            },
+            ("housing", "comparative"): {
+                "name": "housing_comparative",
+                "focus": "development_impact_comparison",
+                "metrics": ["displacement_risk", "affordability", "density"],
+                "scenarios": ["current_housing", "proposed_development", "alternatives"]
+            },
+            ("climate", "scenario_planning"): {
+                "name": "climate_scenario",
+                "focus": "environmental_impact_analysis",
+                "metrics": ["temperature_effects", "vulnerability", "adaptation"],
+                "scenarios": ["current_climate", "projected_changes", "mitigation"]
+            }
+        }
+        
+        key = (classification.primary_domain.value, classification.query_type.value)
+        return templates.get(key, {
+            "name": "general_analysis",
+            "focus": "multi_factor_assessment",
+            "metrics": ["impact", "feasibility", "community_benefit"],
+            "scenarios": ["current", "proposed", "alternative"]
+        })
+    
+    async def _generate_neighborhood_scenario(
+        self, neighborhood: str, classification: QueryClassification, 
+        template: Dict[str, Any], context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate scenario for specific neighborhood"""
+        
+        # Get neighborhood characteristics from context
+        neighborhood_data = context.data.get(neighborhood, {})
+        characteristics = neighborhood_data.get("characteristics", {})
+        
+        # Generate scenario based on template and neighborhood
+        scenario = {
+            "neighborhood": neighborhood,
+            "template": template["name"],
+            "analysis_type": template["focus"],
+            "current_conditions": self._get_current_conditions(neighborhood, classification),
+            "projected_impacts": self._calculate_projected_impacts(
+                neighborhood, classification, template
+            ),
+            "implementation_considerations": self._get_implementation_considerations(
+                neighborhood, classification
+            ),
+            "metrics": self._generate_neighborhood_metrics(neighborhood, template, classification)
+        }
+        
+        self.log(f"📋 Generated {template['name']} scenario for {neighborhood}")
+        return scenario
+    
+    def _get_current_conditions(self, neighborhood: str, classification: QueryClassification) -> Dict[str, Any]:
+        """Get baseline conditions for neighborhood"""
+        baseline_data = {
+            "Marina": {
+                "transportation": {"car_dependency": "high", "transit_access": "limited", "walkability": "medium"},
+                "housing": {"density": "low", "affordability": "low", "character": "single_family"},
+                "climate": {"flood_risk": "high", "heat_vulnerability": "low", "air_quality": "good"}
+            },
+            "Mission": {
+                "transportation": {"car_dependency": "medium", "transit_access": "excellent", "walkability": "high"},
+                "housing": {"density": "high", "affordability": "medium", "character": "mixed_use"},
+                "climate": {"flood_risk": "low", "heat_vulnerability": "medium", "air_quality": "moderate"}
+            },
+            "Hayes Valley": {
+                "transportation": {"car_dependency": "low", "transit_access": "excellent", "walkability": "high"},
+                "housing": {"density": "medium", "affordability": "low", "character": "transit_oriented"},
+                "climate": {"flood_risk": "low", "heat_vulnerability": "low", "air_quality": "good"}
+            }
+        }
+        
+        return baseline_data.get(neighborhood, {}).get(classification.primary_domain.value, {})
+    
+    def _calculate_projected_impacts(
+        self, neighborhood: str, classification: QueryClassification, template: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Calculate projected impacts based on template and parameters"""
+        impacts = {}
+        
+        # Extract parameters from classification
+        parameters = classification.parameters
+        
+        if classification.primary_domain == QueryDomain.TRANSPORTATION:
+            if "percentages" in parameters:
+                percentage = parameters["percentages"][0]
+                impacts = {
+                    "traffic_change": f"+{percentage}%",
+                    "parking_demand": f"+{percentage * 0.6:.1f}%",
+                    "air_quality": f"+{percentage * 0.8:.1f}% emissions"
+                }
+        
+        elif classification.primary_domain == QueryDomain.CLIMATE:
+            if "value_degrees" in parameters:
+                degrees = parameters["value_degrees"]
+                impacts = {
+                    "temperature_change": f"{degrees:.1f}°F",
+                    "energy_demand": f"+{degrees * 3:.1f}% heating",
+                    "infrastructure_stress": "medium" if degrees < 15 else "high"
+                }
+        
+        return impacts
+    
+    def _get_implementation_considerations(self, neighborhood: str, classification: QueryClassification) -> List[str]:
+        """Get neighborhood-specific implementation considerations"""
+        considerations = {
+            "Marina": [
+                "Limited public transit access",
+                "Flood zone constraints",
+                "Community resistance to density",
+                "Parking availability challenges"
+            ],
+            "Mission": [
+                "Displacement risk management",
+                "Cultural preservation requirements", 
+                "Existing transit infrastructure",
+                "Community engagement protocols"
+            ],
+            "Hayes Valley": [
+                "Transit-first policy compliance",
+                "Event coordination requirements",
+                "Mixed-use development standards",
+                "Walkability enhancement opportunities"
+            ]
+        }
+        
+        return considerations.get(neighborhood, ["General urban planning considerations"])
+    
+    def _generate_neighborhood_metrics(
+        self, neighborhood: str, template: Dict[str, Any], classification: QueryClassification
+    ) -> Dict[str, Any]:
+        """Generate quantitative metrics for scenario"""
+        base_metrics = {
+            "confidence": classification.confidence,
+            "complexity": "medium",
+            "timeline": "2-5 years",
+            "cost_estimate": "moderate"
+        }
+        
+        # Add template-specific metrics
+        for metric in template.get("metrics", []):
+            if metric == "accessibility":
+                base_metrics["accessibility_score"] = 0.8 if neighborhood == "Hayes Valley" else 0.6
+            elif metric == "displacement_risk":
+                base_metrics["displacement_risk"] = 0.7 if neighborhood == "Mission" else 0.3
+        
+        return base_metrics
+    
+    def _generate_comparative_analysis(
+        self, neighborhoods: List[str], classification: QueryClassification, context: AgentContext
+    ) -> Dict[str, Any]:
+        """Generate cross-neighborhood comparative analysis"""
+        return {
+            "comparison_type": "multi_neighborhood",
+            "key_differences": [
+                f"Transit access varies: {', '.join(neighborhoods)}",
+                f"Different community characteristics across neighborhoods",
+                f"Varying implementation complexity by area"
+            ],
+            "coordination_opportunities": [
+                "Shared infrastructure investments",
+                "Policy consistency across neighborhoods",
+                "Cross-neighborhood pilot programs"
+            ],
+            "priority_ranking": neighborhoods,  # Could be more sophisticated
+            "synergy_potential": "medium"
+        }
+    
+    def _generate_implementation_timeline(self, classification: QueryClassification) -> Dict[str, str]:
+        """Generate implementation timeline based on classification"""
+        if classification.query_type == QueryType.SCENARIO_PLANNING:
+            return {
+                "immediate": "Feasibility assessment and community engagement",
+                "short_term": "Pilot program implementation (6-18 months)",
+                "medium_term": "Full implementation and monitoring (2-5 years)",
+                "long_term": "Evaluation and iteration (5+ years)"
+            }
+        else:
+            return {
+                "immediate": "Detailed analysis and stakeholder consultation",
+                "short_term": "Policy development and approval process",
+                "medium_term": "Implementation and early monitoring",
+                "long_term": "Long-term impact assessment"
+            }
     
     async def _generate_scenarios(self, context: AgentContext) -> List[Dict[str, Any]]:
         """Generate domain-specific scenarios"""
