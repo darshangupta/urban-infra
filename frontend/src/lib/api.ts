@@ -177,6 +177,25 @@ export class UrbanPlanningAPI {
 
     return response.json();
   }
+
+  /**
+   * Explore query with real agent analysis
+   */
+  async exploreQuery(query: string): Promise<ExploratoryCanvasResult> {
+    const response = await fetch(`${this.baseUrl}/api/v1/explore`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Exploration failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 // Default API instance

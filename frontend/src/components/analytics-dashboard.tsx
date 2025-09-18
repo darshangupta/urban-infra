@@ -35,6 +35,9 @@ interface AnalyticsDashboardProps {
 
 export function AnalyticsDashboard({ data, onExploreMore }: AnalyticsDashboardProps) {
   const { context, neighborhood_analyses, comparative_insights, scenario_branches, exploration_suggestions, related_questions, agent_reasoning } = data;
+  
+  // Debug log to check if agent_reasoning is being passed
+  console.log('AnalyticsDashboard data:', { agent_reasoning, hasAgentReasoning: !!agent_reasoning });
 
   return (
     <div className="space-y-6">
@@ -174,7 +177,7 @@ function renderOverviewDashboard(context: any, neighborhood_analyses: any[], com
       {renderDomainOverview(context.primary_domain, neighborhood_analyses)}
 
       {/* Agent Reasoning (if available) */}
-      {agent_reasoning && (
+      {agent_reasoning && typeof agent_reasoning === 'object' && (
         <Card className="transition-all duration-300 hover:shadow-lg border-blue-200 dark:border-blue-800">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
