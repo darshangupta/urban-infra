@@ -173,6 +173,53 @@ function renderOverviewDashboard(context: any, neighborhood_analyses: any[], com
       {/* Domain-Specific Overview */}
       {renderDomainOverview(context.primary_domain, neighborhood_analyses)}
 
+      {/* Agent Reasoning (if available) */}
+      {agent_reasoning && (
+        <Card className="transition-all duration-300 hover:shadow-lg border-blue-200 dark:border-blue-800">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Real Agent Analysis
+            </CardTitle>
+            <CardDescription className="text-foreground/80">
+              Live autonomous agent execution log
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 text-sm">Interpreter Agent</h4>
+                  <p className="text-xs text-blue-700 dark:text-blue-200 mt-1">
+                    {agent_reasoning.interpreter}
+                  </p>
+                </div>
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <h4 className="font-medium text-green-900 dark:text-green-100 text-sm">Planner Agent</h4>
+                  <p className="text-xs text-green-700 dark:text-green-200 mt-1">
+                    {agent_reasoning.planner}
+                  </p>
+                </div>
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <h4 className="font-medium text-purple-900 dark:text-purple-100 text-sm">Evaluator Agent</h4>
+                  <p className="text-xs text-purple-700 dark:text-purple-200 mt-1">
+                    {agent_reasoning.evaluator}
+                  </p>
+                </div>
+              </div>
+              {agent_reasoning.execution_log && (
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-foreground text-sm mb-2">Execution Log</h4>
+                  <p className="text-xs text-foreground/70 font-mono leading-relaxed">
+                    {agent_reasoning.execution_log}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Summary */}
       <Card className="transition-all duration-300 hover:shadow-lg">
         <CardHeader>
