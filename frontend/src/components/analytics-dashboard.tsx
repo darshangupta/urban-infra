@@ -74,6 +74,34 @@ export function AnalyticsDashboard({ data, onExploreMore }: AnalyticsDashboardPr
         </CardHeader>
       </Card>
 
+      {/* Validation Error Warning */}
+      {neighborhood_analyses?.[0]?.characteristics?.validation_error && (
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+          <CardHeader>
+            <CardTitle className="text-amber-800 dark:text-amber-200 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Query Validation Warning
+            </CardTitle>
+            <CardDescription className="text-amber-700 dark:text-amber-300">
+              {neighborhood_analyses[0].characteristics.validation_error}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                This query doesn't appear to be related to urban planning. Try asking about:
+              </p>
+              <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-1">
+                <li>Housing development in SF neighborhoods</li>
+                <li>Transportation and transit improvements</li>
+                <li>Climate impacts and environmental planning</li>
+                <li>Zoning changes and development policies</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
@@ -85,7 +113,7 @@ export function AnalyticsDashboard({ data, onExploreMore }: AnalyticsDashboardPr
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {renderOverviewDashboard(context, neighborhood_analyses, comparative_insights)}
+          {renderOverviewDashboard(context, neighborhood_analyses, comparative_insights, agent_reasoning)}
         </TabsContent>
 
         {/* Neighborhoods Tab */}
@@ -137,7 +165,7 @@ export function AnalyticsDashboard({ data, onExploreMore }: AnalyticsDashboardPr
   );
 }
 
-function renderOverviewDashboard(context: any, neighborhood_analyses: any[], comparative_insights: any) {
+function renderOverviewDashboard(context: any, neighborhood_analyses: any[], comparative_insights: any, agent_reasoning?: any) {
   return (
     <div className="space-y-6">
       {/* Key Metrics Grid */}
@@ -191,19 +219,19 @@ function renderOverviewDashboard(context: any, neighborhood_analyses: any[], com
           <CardContent>
             <div className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/60 rounded-lg">
                   <h4 className="font-medium text-blue-900 dark:text-blue-100 text-sm">Interpreter Agent</h4>
                   <p className="text-xs text-blue-700 dark:text-blue-200 mt-1">
                     {agent_reasoning.interpreter}
                   </p>
                 </div>
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="p-3 bg-green-50 dark:bg-green-900/60 rounded-lg">
                   <h4 className="font-medium text-green-900 dark:text-green-100 text-sm">Planner Agent</h4>
                   <p className="text-xs text-green-700 dark:text-green-200 mt-1">
                     {agent_reasoning.planner}
                   </p>
                 </div>
-                <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/60 rounded-lg">
                   <h4 className="font-medium text-purple-900 dark:text-purple-100 text-sm">Evaluator Agent</h4>
                   <p className="text-xs text-purple-700 dark:text-purple-200 mt-1">
                     {agent_reasoning.evaluator}
@@ -330,36 +358,106 @@ function renderInsightsAnalysis(neighborhood_analyses: any[], comparative_insigh
     Object.values(n.impact_analysis).flatMap((d: any) => d.insights)
   );
 
+  // Clean comparative insights formatting
+  const formatInsightValue = (value: any) => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return value.join('; ');
+    if (typeof value === 'object' && value !== null) {
+      // Convert object to readable format
+      return Object.entries(value)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+    }
+    return String(value);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Comparative Insights */}
-      {comparative_insights && (
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-foreground">Cross-Neighborhood Comparison</CardTitle>
-            <CardDescription className="text-foreground/80">
-              How different areas compare and opportunities for coordination
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {Object.entries(comparative_insights).map(([key, value]: [string, any]) => (
-              <div key={key} className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="font-medium text-sm text-foreground capitalize">
-                    {key.replace('_', ' ')}
-                  </div>
-                  <div className="text-xs text-foreground/70 mt-1">
-                    {typeof value === 'string' ? value : JSON.stringify(value)}
+      {/* Cross-Neighborhood Comparison */}
+      <Card className="transition-all duration-300 hover:shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-foreground">Cross-Neighborhood Comparison</CardTitle>
+          <CardDescription className="text-foreground/80">
+            How different areas compare and opportunities for coordination
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Neighborhood Differences */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-foreground flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-500" />
+              Neighborhood Differences
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {neighborhood_analyses.map((analysis, index) => (
+                <div key={index} className="p-4 border rounded-lg bg-muted/10">
+                  <h5 className="font-medium text-foreground mb-2">{analysis.neighborhood}</h5>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(analysis.characteristics).map(([key, value]: [string, any]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-foreground/60 capitalize">{key.replace('_', ' ')}</span>
+                        <span className="text-foreground font-medium">{formatInsightValue(value)}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              ))}
+            </div>
+          </div>
 
-      {/* Key Insights Categorized */}
+          {/* Implementation Priorities */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-foreground flex items-center gap-2">
+              <Target className="h-4 w-4 text-green-500" />
+              Implementation Priorities
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/60 rounded-lg">
+                <div className="font-medium text-blue-900 dark:text-blue-100">Short-term (0-2 years)</div>
+                <div className="text-sm text-blue-700 dark:text-blue-200">Policy changes, zoning updates</div>
+              </div>
+              <div className="p-3 bg-green-50 dark:bg-green-900/60 rounded-lg">
+                <div className="font-medium text-green-900 dark:text-green-100">Medium-term (2-5 years)</div>
+                <div className="text-sm text-green-700 dark:text-green-200">Infrastructure improvements</div>
+              </div>
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/60 rounded-lg">
+                <div className="font-medium text-purple-900 dark:text-purple-100">Long-term (5+ years)</div>
+                <div className="text-sm text-purple-700 dark:text-purple-200">Major development projects</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Equity Considerations */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-foreground flex items-center gap-2">
+              <Users className="h-4 w-4 text-orange-500" />
+              Equity Considerations
+            </h4>
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/60 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="font-medium text-orange-900 dark:text-orange-100 mb-2">Displacement Risk Factors</div>
+                  <ul className="space-y-1 text-orange-700 dark:text-orange-200">
+                    <li>• Rising property values</li>
+                    <li>• Limited affordable housing</li>
+                    <li>• Transit improvements increasing demand</li>
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-medium text-orange-900 dark:text-orange-100 mb-2">Mitigation Strategies</div>
+                  <ul className="space-y-1 text-orange-700 dark:text-orange-200">
+                    <li>• Community land trusts</li>
+                    <li>• Inclusionary housing requirements</li>
+                    <li>• Small business protection</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Key Insights Summary */}
       <Card className="transition-all duration-300 hover:shadow-lg">
         <CardHeader>
           <CardTitle className="text-foreground">Key Insights Summary</CardTitle>
@@ -368,14 +466,41 @@ function renderInsightsAnalysis(neighborhood_analyses: any[], comparative_insigh
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allInsights.slice(0, 8).map((insight: string, index: number) => (
-              <div key={index} className="flex items-start gap-2 p-3 border rounded-lg hover:bg-muted/20 transition-colors">
-                <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-foreground/80">{insight}</span>
+          {allInsights && allInsights.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allInsights.slice(0, 8).map((insight: string, index: number) => (
+                <div key={index} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/20 transition-colors">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <div className="w-6 h-6 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                      <Lightbulb className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                  </div>
+                  <span className="text-sm text-foreground/80 leading-relaxed">{insight}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="space-y-4">
+                <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                  <BarChart3 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-foreground">Analysis Complete</h3>
+                  <p className="text-sm text-foreground/60 mt-1">
+                    Agent-generated insights for {context.primary_domain} in {neighborhood_analyses.map(n => n.neighborhood).join(', ')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {neighborhood_analyses.map((analysis, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {analysis.neighborhood}: {Object.keys(analysis.characteristics).length} factors analyzed
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -435,25 +560,25 @@ function renderScenariosAnalysis(scenario_branches: any[] | undefined, context: 
             <CardContent>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/60 rounded-lg">
                     <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Base Scenario</h4>
                     <p className="text-sm text-blue-700 dark:text-blue-200">
                       Current conditions and immediate impacts of implementing the proposed changes.
                     </p>
                   </div>
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/60 rounded-lg">
                     <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">Optimistic Scenario</h4>
                     <p className="text-sm text-green-700 dark:text-green-200">
                       Best-case outcomes with community support and optimal implementation.
                     </p>
                   </div>
-                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/60 rounded-lg">
                     <h4 className="font-medium text-orange-900 dark:text-orange-100 mb-2">Cautious Scenario</h4>
                     <p className="text-sm text-orange-700 dark:text-orange-200">
                       Conservative approach addressing potential resistance and constraints.
                     </p>
                   </div>
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/60 rounded-lg">
                     <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">Alternative Scenario</h4>
                     <p className="text-sm text-purple-700 dark:text-purple-200">
                       Modified approach considering different implementation strategies.

@@ -839,6 +839,19 @@ def generate_related_questions(context: QueryContext, query: str) -> List[str]:
 async def explore_urban_query(request: PlanAnalysisRequest):
     """REAL AGENTS: Multi-agent analysis using CrewAI autonomous agents"""
     
+    # Input validation guardrails
+    if not request.query or len(request.query.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Query too short - please provide a meaningful urban planning question")
+    
+    if len(request.query) > 1000:
+        raise HTTPException(status_code=400, detail="Query too long - please keep under 1000 characters")
+    
+    # Basic security check for common injection patterns
+    dangerous_patterns = ["<script", "javascript:", "eval(", "DROP TABLE", "DELETE FROM", "../"]
+    query_lower = request.query.lower()
+    if any(pattern in query_lower for pattern in dangerous_patterns):
+        raise HTTPException(status_code=400, detail="Invalid query format detected")
+    
     try:
         # Execute lightweight agent crew instead of fake functions
         crew = LightweightAgentCrew()
@@ -858,7 +871,10 @@ async def explore_urban_query(request: PlanAnalysisRequest):
             neighborhood_analyses=[
                 NeighborhoodAnalysis(
                     neighborhood=neighborhood,
-                    characteristics=agent_context.data.get(neighborhood, {}).get("characteristics", {}),
+                    characteristics={
+                        **agent_context.data.get(neighborhood, {}).get("characteristics", {}),
+                        "validation_error": agent_context.data.get("validation_error")  # Pass validation error through
+                    },
                     impact_analysis={
                         "primary": ExploratoryDimension(
                             title=f"{neighborhood} Real Agent Analysis",

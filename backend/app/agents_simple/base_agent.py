@@ -85,6 +85,16 @@ class InterpreterAgent(BaseAgent):
         """Analyze query and gather neighborhood data"""
         self.log(f"Analyzing query: '{context.query}'")
         
+        # GUARDRAIL: Validate query first
+        if not self._is_valid_urban_planning_query(context.query):
+            context.confidence = 0.1
+            context.neighborhoods = ["Mission"]  # Default fallback
+            context.primary_domain = "general"
+            context.data["validation_error"] = "Query does not appear to be related to urban planning"
+            self.log("❌ Query validation failed - not urban planning related")
+            context.reasoning.extend(self.execution_log)
+            return context
+        
         # Step 1: Extract neighborhoods
         neighborhoods = self._extract_neighborhoods(context.query)
         context.neighborhoods = neighborhoods
@@ -135,7 +145,7 @@ class InterpreterAgent(BaseAgent):
             return "climate"
         elif any(word in query_lower for word in ["housing", "units", "development", "density"]):
             return "housing"
-        elif any(word in query_lower for word in ["bike", "transit", "transport", "walkable"]):
+        elif any(word in query_lower for word in ["bike", "transit", "transport", "walkable", "cars", "traffic", "vehicles", "parking", "congestion", "mobility", "commute", "driving"]):
             return "transportation"
         elif any(word in query_lower for word in ["business", "economic", "revenue", "jobs"]):
             return "economics"
@@ -168,6 +178,56 @@ class InterpreterAgent(BaseAgent):
             "Hayes Valley": {"density": "medium", "transit": "excellent", "character": "gentrifying"}
         }
         return characteristics.get(neighborhood, {"density": "unknown", "transit": "unknown", "character": "unknown"})
+    
+    def _is_valid_urban_planning_query(self, query: str) -> bool:
+        """GUARDRAIL: Check if query is related to urban planning"""
+        if not query or len(query.strip()) < 3:
+            return False
+        
+        # Clean the query
+        query_clean = query.strip().lower()
+        
+        # Check for random characters/gibberish
+        if len([c for c in query_clean if c.isalpha()]) < len(query_clean) * 0.6:
+            return False
+        
+        # Urban planning keywords
+        urban_keywords = [
+            # Core urban planning
+            "housing", "development", "zoning", "neighborhood", "building", "density",
+            "transit", "transportation", "walkable", "bike", "pedestrian", "planning",
+            
+            # SF neighborhoods
+            "mission", "marina", "hayes", "valley", "francisco", "sf",
+            
+            # Infrastructure  
+            "infrastructure", "utilities", "water", "sewer", "street", "road",
+            "park", "green", "space", "public", "community",
+            
+            # Policy/Planning
+            "affordable", "gentrification", "displacement", "equity", "policy",
+            "permit", "approval", "variance", "height", "setback",
+            
+            # Environmental
+            "climate", "flood", "sea level", "temperature", "environmental",
+            "sustainability", "energy", "solar", "green building",
+            
+            # Economic
+            "cost", "price", "value", "economic", "business", "commercial",
+            "retail", "office", "mixed use",
+            
+            # Questions words that might indicate planning queries
+            "what if", "how would", "where should", "can we", "should we",
+            "impact", "effect", "affect", "change", "improve", "add", "build"
+        ]
+        
+        # Check if query contains urban planning concepts
+        has_urban_context = any(keyword in query_clean for keyword in urban_keywords)
+        
+        # Check for question structure
+        has_question_structure = any(q in query_clean for q in ["?", "what", "how", "where", "when", "why", "can", "should", "would"])
+        
+        return has_urban_context or has_question_structure
     
     def _calculate_confidence(self, context: AgentContext) -> float:
         """Calculate confidence based on data availability"""
@@ -257,24 +317,161 @@ class PlannerAgent(BaseAgent):
         return scenarios
     
     async def _transportation_scenarios(self, context: AgentContext) -> List[Dict[str, Any]]:
-        """Generate transportation scenarios"""
+        """Generate detailed transportation scenarios with traffic analysis"""
         scenarios = []
+        query_lower = context.query.lower()
+        
+        # Detect specific transportation impacts
+        is_car_increase = any(word in query_lower for word in ["cars", "vehicles", "traffic"]) and any(word in query_lower for word in ["increase", "more", "additional", "%"])
+        is_parking_query = "parking" in query_lower
+        is_congestion_query = "congestion" in query_lower
         
         for neighborhood in context.neighborhoods:
-            scenario = {
-                "neighborhood": neighborhood,
-                "type": "transportation_improvement",
-                "description": f"Enhanced mobility options for {neighborhood}",
-                "parameters": {
-                    "bike_infrastructure": "protected bike lanes",
-                    "transit": "improved bus frequency" if neighborhood == "Marina" else "existing excellent transit",
-                    "walkability": "pedestrian improvements"
-                },
-                "feasibility": "high"
-            }
+            if is_car_increase:
+                scenario = await self._generate_traffic_impact_scenario(neighborhood, context)
+            elif is_parking_query:
+                scenario = await self._generate_parking_scenario(neighborhood, context)
+            elif is_congestion_query:
+                scenario = await self._generate_congestion_scenario(neighborhood, context)
+            else:
+                scenario = await self._generate_general_mobility_scenario(neighborhood, context)
+            
             scenarios.append(scenario)
         
         return scenarios
+    
+    async def _generate_traffic_impact_scenario(self, neighborhood: str, context: AgentContext) -> Dict[str, Any]:
+        """Generate detailed traffic impact analysis"""
+        # Extract percentage if mentioned
+        query_lower = context.query.lower()
+        percentage = 10  # Default
+        if "%" in query_lower:
+            import re
+            match = re.search(r'(\d+)%', query_lower)
+            if match:
+                percentage = int(match.group(1))
+        
+        # Neighborhood-specific traffic data
+        traffic_data = {
+            "Marina": {
+                "current_daily_vehicles": 15000,
+                "parking_spaces": 2800,
+                "peak_congestion_points": ["Marina Blvd/Fillmore", "Lombard/Broderick"],
+                "access_routes": ["Marina Blvd", "Lombard St", "Union St"],
+                "constraints": ["Limited peninsula access", "Tourist traffic", "Event parking (Marina Green)"],
+                "environmental_factors": ["Waterfront air quality", "Residential noise sensitivity"]
+            },
+            "Mission": {
+                "current_daily_vehicles": 25000,
+                "parking_spaces": 1800,
+                "peak_congestion_points": ["Mission/16th", "Mission/24th", "Valencia/16th"],
+                "access_routes": ["Mission St", "Valencia St", "16th St", "24th St"],
+                "constraints": ["Dense street grid", "Limited parking", "Heavy transit use"],
+                "environmental_factors": ["Air quality in corridor", "Pedestrian safety"]
+            },
+            "Hayes Valley": {
+                "current_daily_vehicles": 12000,
+                "parking_spaces": 1200,
+                "peak_congestion_points": ["Market/Gough", "Fell/Octavia"],
+                "access_routes": ["Market St", "Fell St", "Oak St", "Hayes St"],
+                "constraints": ["Transit-first policy", "Limited street parking", "Event traffic (venues)"],
+                "environmental_factors": ["Central location air quality", "Mixed-use noise levels"]
+            }
+        }
+        
+        data = traffic_data.get(neighborhood, traffic_data["Mission"])
+        
+        # Calculate impacts
+        additional_vehicles = int(data["current_daily_vehicles"] * (percentage / 100))
+        current_parking = data["parking_spaces"]
+        additional_parking_needed = int(additional_vehicles * 0.6)  # Assume 60% need parking
+        parking_deficit = max(0, additional_parking_needed - (current_parking * 0.1))  # 10% current availability
+        
+        scenario = {
+            "neighborhood": neighborhood,
+            "type": "traffic_impact_analysis",
+            "description": f"{percentage}% increase in vehicle traffic analysis for {neighborhood}",
+            "quantitative_impacts": {
+                "additional_daily_vehicles": additional_vehicles,
+                "new_daily_total": data["current_daily_vehicles"] + additional_vehicles,
+                "additional_parking_demand": additional_parking_needed,
+                "parking_deficit": parking_deficit,
+                "congestion_increase": f"{percentage * 1.5:.1f}%" if neighborhood == "Marina" else f"{percentage * 1.2:.1f}%"
+            },
+            "specific_impacts": {
+                "congestion_points": data["peak_congestion_points"],
+                "capacity_strain": data["access_routes"][:2],  # Most impacted routes
+                "parking_pressure": f"Need {additional_parking_needed} additional spaces, deficit of {parking_deficit}",
+                "environmental": f"Air quality: +{percentage * 0.8:.1f}% emissions, Noise: +{percentage * 0.6:.1f}% peak levels"
+            },
+            "neighborhood_constraints": data["constraints"],
+            "mitigation_strategies": self._get_traffic_mitigation_strategies(neighborhood, percentage),
+            "timeline_impacts": {
+                "immediate": "Increased congestion during peak hours",
+                "short_term": "Parking availability decreases, local air quality impacts",
+                "long_term": "Infrastructure wear, potential resident displacement due to noise/pollution"
+            },
+            "feasibility": "concerning" if parking_deficit > 200 else "manageable"
+        }
+        
+        return scenario
+    
+    def _get_traffic_mitigation_strategies(self, neighborhood: str, percentage: int) -> List[str]:
+        """Get neighborhood-specific traffic mitigation strategies"""
+        base_strategies = [
+            "Implement dynamic parking pricing",
+            "Expand car-sharing programs",
+            "Improve alternative transportation incentives"
+        ]
+        
+        if neighborhood == "Marina":
+            return base_strategies + [
+                "Shuttle service to Union Square/downtown",
+                "Park-and-ride facility outside neighborhood",
+                "Time-restricted access during events",
+                "Enhanced bike path to Presidio/Crissy Field"
+            ]
+        elif neighborhood == "Mission":
+            return base_strategies + [
+                "Expand BART/Muni capacity",
+                "Protected bike lanes on Mission/Valencia",
+                "Pedestrian-only zones during peak hours",
+                "Residential parking permits"
+            ]
+        else:  # Hayes Valley
+            return base_strategies + [
+                "Leverage existing excellent transit",
+                "Bike-share station expansion",
+                "Event coordination with venues",
+                "Smart traffic signals"
+            ]
+    
+    async def _generate_parking_scenario(self, neighborhood: str, context: AgentContext) -> Dict[str, Any]:
+        """Generate parking-specific analysis"""
+        return {
+            "neighborhood": neighborhood,
+            "type": "parking_analysis",
+            "description": f"Parking capacity and management analysis for {neighborhood}",
+            "feasibility": "high"
+        }
+    
+    async def _generate_congestion_scenario(self, neighborhood: str, context: AgentContext) -> Dict[str, Any]:
+        """Generate congestion-specific analysis"""
+        return {
+            "neighborhood": neighborhood,
+            "type": "congestion_analysis", 
+            "description": f"Traffic congestion impact analysis for {neighborhood}",
+            "feasibility": "high"
+        }
+    
+    async def _generate_general_mobility_scenario(self, neighborhood: str, context: AgentContext) -> Dict[str, Any]:
+        """Generate general mobility analysis"""
+        return {
+            "neighborhood": neighborhood,
+            "type": "mobility_enhancement",
+            "description": f"General transportation improvements for {neighborhood}",
+            "feasibility": "high"
+        }
     
     async def _general_scenarios(self, context: AgentContext) -> List[Dict[str, Any]]:
         """Generate general planning scenarios"""
