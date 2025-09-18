@@ -1,13 +1,15 @@
 """
-Agent 2: Planner Agent - Generate feasible development scenarios from research briefs
+Agent 2: Planner Agent - Template-driven scenario generation based on query classification
 """
 
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from enum import Enum
+import httpx
+import json
 # Import will be handled by test files to avoid circular dependencies
 # from .research_agent import ResearchBrief, PlanningIntent
-import httpx
+# from .interpreter import QueryClassification
 
 
 class PlanFeasibility(str, Enum):
@@ -85,13 +87,355 @@ class PlanningAlternatives(BaseModel):
     planning_notes: List[str]
 
 
+class AnalysisTemplate(BaseModel):
+    """Template for domain-specific analysis generation"""
+    domain: str
+    sub_domain: str
+    query_type: str
+    template_name: str
+    metrics: List[str]
+    calculations: Dict[str, str]
+    neighborhood_factors: Dict[str, List[str]]
+    mitigation_strategies: List[str]
+    output_structure: Dict[str, Any]
+
+
 class PlannerAgent:
-    """Agent 2: Generate feasible development scenarios from research briefs"""
+    """Agent 2: Template-driven scenario generation based on query classification"""
     
     def __init__(self):
-        """Initialize planner agent with API clients"""
+        """Initialize planner agent with API clients and analysis templates"""
         self.api_base = "http://localhost:8001/api/v1"
+        self.analysis_templates = self._load_analysis_templates()
+    
+    def _load_analysis_templates(self) -> Dict[str, AnalysisTemplate]:
+        """Load analysis templates for different domain/query type combinations"""
+        templates = {}
         
+        # Transportation/Traffic Impact Template
+        templates["transportation_traffic_impact"] = AnalysisTemplate(
+            domain="transportation",
+            sub_domain="traffic_congestion", 
+            query_type="impact_analysis",
+            template_name="Traffic Impact Analysis",
+            metrics=["daily_vehicles", "peak_hour_volume", "parking_demand", "congestion_points"],
+            calculations={
+                "parking_deficit": "additional_vehicles * 0.6 - available_spaces",
+                "congestion_increase": "base_volume * (1 + vehicle_increase_pct) - road_capacity",
+                "revenue_impact": "parking_deficit * daily_rate * 365"
+            },
+            neighborhood_factors={
+                "marina": ["car_dependent_residents", "limited_transit", "waterfront_access", "affluent_demographics"],
+                "mission": ["walkable_corridors", "transit_rich", "diverse_businesses", "parking_scarce"],
+                "hayes_valley": ["mixed_use", "transit_oriented", "pedestrian_friendly", "emerging_commercial"]
+            },
+            mitigation_strategies=[
+                "dynamic_parking_pricing", "alternative_transportation_incentives", 
+                "traffic_calming_measures", "parking_time_restrictions"
+            ],
+            output_structure={
+                "quantitative_analysis": ["vehicle_counts", "parking_metrics", "congestion_levels"],
+                "neighborhood_impacts": ["business_effects", "resident_impacts", "accessibility_changes"],
+                "mitigation_recommendations": ["short_term", "long_term", "policy_changes"]
+            }
+        )
+        
+        # Housing Development Template
+        templates["housing_development_impact"] = AnalysisTemplate(
+            domain="housing",
+            sub_domain="affordable_housing",
+            query_type="impact_analysis", 
+            template_name="Housing Development Analysis",
+            metrics=["total_units", "affordable_units", "displacement_risk", "infrastructure_capacity"],
+            calculations={
+                "affordability_ratio": "affordable_units / total_units",
+                "density_increase": "new_units / existing_units_in_area",
+                "infrastructure_load": "new_residents * infrastructure_capacity_per_person"
+            },
+            neighborhood_factors={
+                "marina": ["low_density_character", "height_restrictions", "flood_risk", "affluent_opposition"],
+                "mission": ["displacement_pressure", "cultural_significance", "existing_density", "community_organizing"],
+                "hayes_valley": ["transit_accessibility", "mixed_income", "development_pressure", "historic_character"]
+            },
+            mitigation_strategies=[
+                "inclusionary_housing_requirements", "community_land_trusts",
+                "anti_displacement_policies", "affordable_housing_preservation"
+            ],
+            output_structure={
+                "development_scenarios": ["conservative", "moderate", "aggressive"],
+                "community_impacts": ["displacement_analysis", "affordability_effects", "character_changes"],
+                "policy_recommendations": ["zoning_changes", "community_benefits", "financing_strategies"]
+            }
+        )
+        
+        # Business Impact Template  
+        templates["economics_business_impact"] = AnalysisTemplate(
+            domain="economics",
+            sub_domain="business_ecosystem",
+            query_type="impact_analysis",
+            template_name="Business Impact Analysis",
+            metrics=["customer_accessibility", "foot_traffic", "revenue_projections", "business_displacement"],
+            calculations={
+                "accessibility_change": "(new_access_score - current_access_score) / current_access_score",
+                "foot_traffic_impact": "infrastructure_change_factor * baseline_pedestrian_volume",
+                "revenue_impact_pct": "foot_traffic_change * revenue_elasticity_factor"
+            },
+            neighborhood_factors={
+                "marina": ["car_dependent_customers", "high_end_retail", "suburban_shopping_patterns", "parking_dependent"],
+                "mission": ["walkable_customers", "community_businesses", "price_sensitive", "transit_accessible"],
+                "hayes_valley": ["pedestrian_shoppers", "design_focused", "mixed_demographics", "boutique_retail"]
+            },
+            mitigation_strategies=[
+                "small_business_support_programs", "temporary_relocation_assistance",
+                "marketing_and_promotion", "infrastructure_phasing"
+            ],
+            output_structure={
+                "business_analysis": ["customer_impact", "revenue_projections", "competitive_effects"],
+                "neighborhood_specific": ["marina_luxury_retail", "mission_community_business", "hayes_valley_boutiques"],
+                "support_strategies": ["financial_assistance", "operational_support", "marketing_help"]
+            }
+        )
+        
+        # Climate/Environmental Template
+        templates["environment_climate_impact"] = AnalysisTemplate(
+            domain="environment",
+            sub_domain="climate_resilience",
+            query_type="scenario_planning",
+            template_name="Climate Impact Analysis", 
+            metrics=["temperature_change", "flood_risk", "energy_demand", "adaptation_costs"],
+            calculations={
+                "heating_cost_increase": "temperature_change * heating_degree_days * energy_cost_per_degree",
+                "flood_risk_multiplier": "base_flood_risk * (1 + sea_level_rise_factor)",
+                "adaptation_investment": "infrastructure_value * climate_adaptation_percentage"
+            },
+            neighborhood_factors={
+                "marina": ["waterfront_vulnerability", "affluent_adaptation_capacity", "single_family_homes", "car_dependency"],
+                "mission": ["inland_location", "vulnerable_populations", "dense_housing", "limited_resources"],
+                "hayes_valley": ["mixed_vulnerability", "transit_access", "urban_heat_island", "development_pressure"]
+            },
+            mitigation_strategies=[
+                "green_infrastructure", "building_retrofits", "emergency_preparedness", "community_resilience_hubs"
+            ],
+            output_structure={
+                "climate_scenarios": ["temperature_impacts", "precipitation_changes", "extreme_events"],
+                "adaptation_strategies": ["infrastructure", "community", "policy"],
+                "investment_priorities": ["immediate", "medium_term", "long_term"]
+            }
+        )
+        
+        return templates
+    
+    def generate_template_analysis(self, classification: Any, neighborhood_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        ENHANCED: Generate analysis using templates based on query classification
+        This replaces hardcoded scenario generation with intelligent template selection
+        """
+        
+        # Select appropriate template based on classification
+        template_key = f"{classification.domain.value}_{classification.intent.value}"
+        
+        if template_key in self.analysis_templates:
+            template = self.analysis_templates[template_key]
+            return self._apply_template(template, classification, neighborhood_data)
+        else:
+            # Fallback to closest template or generic analysis
+            return self._generate_generic_analysis(classification, neighborhood_data)
+    
+    def _apply_template(self, template: AnalysisTemplate, classification: Any, neighborhood_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply analysis template with real data and neighborhood-specific factors"""
+        
+        analysis = {
+            "template_used": template.template_name,
+            "domain": template.domain,
+            "sub_domain": template.sub_domain,
+            "query_classification": {
+                "intent": classification.intent.value,
+                "domain": classification.domain.value,
+                "query_type": classification.query_type.value,
+                "confidence": classification.confidence
+            }
+        }
+        
+        # Generate neighborhood-specific analysis for each neighborhood
+        neighborhood_analyses = {}
+        for neighborhood in classification.neighborhoods:
+            neighborhood_analyses[neighborhood] = self._generate_neighborhood_analysis(
+                template, neighborhood, classification, neighborhood_data.get(neighborhood, {})
+            )
+        
+        analysis["neighborhood_analyses"] = neighborhood_analyses
+        
+        # Generate comparative analysis if multiple neighborhoods
+        if len(classification.neighborhoods) > 1:
+            analysis["comparative_analysis"] = self._generate_comparative_template_analysis(
+                template, classification.neighborhoods, neighborhood_analyses
+            )
+        
+        # Apply template calculations with extracted parameters
+        analysis["quantitative_analysis"] = self._apply_template_calculations(
+            template, classification.parameters, neighborhood_data
+        )
+        
+        # Generate mitigation strategies
+        analysis["mitigation_strategies"] = self._generate_template_mitigations(
+            template, classification, neighborhood_analyses
+        )
+        
+        return analysis
+    
+    def _generate_neighborhood_analysis(self, template: AnalysisTemplate, neighborhood: str, 
+                                      classification: Any, neighborhood_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate neighborhood-specific analysis using template factors"""
+        
+        factors = template.neighborhood_factors.get(neighborhood, [])
+        
+        analysis = {
+            "neighborhood": neighborhood,
+            "relevant_factors": factors,
+            "metrics": {}
+        }
+        
+        # Apply template metrics with neighborhood context
+        for metric in template.metrics:
+            analysis["metrics"][metric] = self._calculate_neighborhood_metric(
+                metric, neighborhood, classification, neighborhood_data, factors
+            )
+        
+        # Generate neighborhood-specific impacts
+        analysis["impacts"] = self._generate_neighborhood_impacts(
+            template, neighborhood, factors, classification
+        )
+        
+        # Generate neighborhood-specific recommendations
+        analysis["recommendations"] = self._generate_neighborhood_recommendations(
+            template, neighborhood, factors, classification
+        )
+        
+        return analysis
+    
+    def _calculate_neighborhood_metric(self, metric: str, neighborhood: str, 
+                                     classification: Any, neighborhood_data: Dict[str, Any], 
+                                     factors: List[str]) -> Dict[str, Any]:
+        """Calculate specific metric value for neighborhood using template logic"""
+        
+        # Extract base values from neighborhood data or use defaults
+        base_values = {
+            "daily_vehicles": neighborhood_data.get("traffic_volume", 5000),
+            "parking_demand": neighborhood_data.get("parking_spaces", 200),
+            "total_units": neighborhood_data.get("housing_units", 500),
+            "foot_traffic": neighborhood_data.get("pedestrian_volume", 1000),
+            "business_count": neighborhood_data.get("businesses", 50)
+        }
+        
+        base_value = base_values.get(metric, 100)
+        
+        # Apply neighborhood-specific modifiers based on factors
+        modifier = 1.0
+        
+        if neighborhood == "marina":
+            if metric == "daily_vehicles" and "car_dependent_residents" in factors:
+                modifier = 1.3  # Higher car usage
+            elif metric == "foot_traffic" and "car_dependent_residents" in factors:
+                modifier = 0.7  # Lower pedestrian activity
+        elif neighborhood == "mission":
+            if metric == "foot_traffic" and "walkable_corridors" in factors:
+                modifier = 1.4  # Higher pedestrian activity
+            elif metric == "parking_demand" and "parking_scarce" in factors:
+                modifier = 0.8  # Lower parking availability
+        elif neighborhood == "hayes_valley":
+            if metric == "foot_traffic" and "pedestrian_friendly" in factors:
+                modifier = 1.2  # Moderate pedestrian boost
+        
+        # Apply parameter impacts from query classification
+        if classification.parameters:
+            if "percentage" in classification.parameters:
+                modifier *= (1 + classification.parameters["percentage"])
+            elif "vehicle_increase" in classification.parameters:
+                if metric == "daily_vehicles":
+                    modifier *= (1 + classification.parameters["vehicle_increase"])
+        
+        calculated_value = base_value * modifier
+        
+        return {
+            "base_value": base_value,
+            "modifier": modifier,
+            "calculated_value": calculated_value,
+            "factors_applied": [f for f in factors if f in str(metric).lower() or metric in str(f).lower()]
+        }
+    
+    def _generate_neighborhood_impacts(self, template: AnalysisTemplate, neighborhood: str,
+                                     factors: List[str], classification: Any) -> List[str]:
+        """Generate neighborhood-specific impacts based on template and factors"""
+        
+        impacts = []
+        
+        if template.domain == "transportation":
+            if neighborhood == "marina" and "car_dependent_residents" in factors:
+                impacts.append("High-end retail may lose suburban customers due to increased congestion")
+                impacts.append("Affluent residents likely to adapt with alternative routes or timing")
+            elif neighborhood == "mission" and "walkable_corridors" in factors:
+                impacts.append("Community businesses may benefit from slower traffic and increased foot traffic")
+                impacts.append("Transit-dependent residents face minimal direct impact")
+            elif neighborhood == "hayes_valley" and "mixed_use" in factors:
+                impacts.append("Pedestrian-oriented businesses may see mixed effects from traffic changes")
+        
+        elif template.domain == "housing":
+            if neighborhood == "mission" and "displacement_pressure" in factors:
+                impacts.append("New development may accelerate gentrification without strong affordability requirements")
+                impacts.append("Cultural businesses and community anchors at risk of displacement")
+            elif neighborhood == "marina" and "low_density_character" in factors:
+                impacts.append("Density increases face strong community resistance and regulatory barriers")
+        
+        elif template.domain == "economics":
+            if "high_end_retail" in factors:
+                impacts.append("Luxury retailers dependent on car access may see revenue decline")
+            elif "community_businesses" in factors:
+                impacts.append("Local businesses may benefit from increased foot traffic and community engagement")
+        
+        return impacts
+    
+    def _generate_neighborhood_recommendations(self, template: AnalysisTemplate, neighborhood: str,
+                                             factors: List[str], classification: Any) -> List[str]:
+        """Generate neighborhood-specific recommendations based on template"""
+        
+        recommendations = []
+        
+        # Base recommendations from template
+        base_strategies = template.mitigation_strategies
+        
+        # Customize based on neighborhood factors
+        if neighborhood == "marina":
+            if "car_dependent_residents" in factors:
+                recommendations.append("Implement premium parking pricing to manage demand")
+                recommendations.append("Provide shuttle services to reduce car dependency")
+        elif neighborhood == "mission":
+            if "community_businesses" in factors:
+                recommendations.append("Create small business support fund for adaptation")
+                recommendations.append("Ensure community input in implementation planning")
+        elif neighborhood == "hayes_valley":
+            if "mixed_use" in factors:
+                recommendations.append("Coordinate with existing mixed-use developments")
+                recommendations.append("Leverage transit access for sustainable solutions")
+        
+        # Add template-specific strategies
+        for strategy in base_strategies[:3]:  # Top 3 strategies
+            recommendations.append(f"Implement {strategy} tailored to {neighborhood} characteristics")
+        
+        return recommendations
+    
+    def _generate_generic_analysis(self, classification: Any, neighborhood_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate generic analysis when no specific template matches"""
+        
+        return {
+            "template_used": "Generic Analysis",
+            "domain": classification.domain.value,
+            "sub_domain": classification.sub_domain,
+            "analysis_type": "fallback",
+            "neighborhoods": classification.neighborhoods,
+            "basic_analysis": f"Analysis for {classification.intent.value} in {', '.join(classification.neighborhoods)}",
+            "note": "Using generic analysis - specific template not available for this domain/intent combination"
+        }
+
     def generate_scenarios(self, research_brief: Any) -> PlanningAlternatives:
         """
         Main entry point: Convert research brief into feasible planning alternatives

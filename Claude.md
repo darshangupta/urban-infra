@@ -106,31 +106,41 @@ curl -X POST http://localhost:8000/api/v1/neighborhoods/hayes_valley/validate-pr
 
 ---
 
-## 🤖 3-Agent System Architecture
+## 🤖 Enhanced 3-Agent System Architecture
 
-### Agent 1: Interpreter
-**Role**: Natural language → Structured planning parameters
-- **Input**: *"Add affordable housing near transit in Hayes Valley"*
+### Agent 1: Enhanced Interpreter ✅ COMPLETED
+**Role**: Dynamic query classification → Structured parameters
+- **Input**: *"How would bike infrastructure affect businesses in Marina vs Mission?"*
 - **Processing**: 
-  - Identify neighborhood (Hayes Valley)
-  - Extract intent (housing development)
-  - Determine constraints (near transit, affordability focus)
-  - Call neighborhood APIs for context
-- **Output**: TwistPack with bounded parameters for planning
+  - **Dynamic Classification**: Intent, domain, query type, parameters
+  - **Multi-neighborhood Detection**: Marina, Mission, Hayes Valley
+  - **Comparative Analysis Detection**: "vs", "compare", multiple neighborhoods
+  - **Parameter Extraction**: Numbers, percentages, timeframes
+- **Output**: QueryClassification with structured categorization
 
-### Agent 2: Planner  
-**Role**: Generate feasible development scenarios
-- **Input**: TwistPack from Interpreter
+**Key Innovation**: No hardcoded scenarios - intelligent classification adapts to any query type
+
+### Agent 2: Template-Driven Planner ✅ COMPLETED
+**Role**: Generate analysis using domain-specific templates
+- **Input**: QueryClassification from Interpreter
 - **Processing**:
-  - Generate 3-5 candidate plans using constraint APIs
-  - Each plan: specific FAR, height, amenity locations
-  - Filter using `/validate-proposal` endpoint
-  - Rank by feasibility and policy alignment
-- **Output**: Feasible planning alternatives with rationale
+  - **Template Selection**: Match domain/intent to analysis template
+  - **Neighborhood-Specific Analysis**: Apply factors per neighborhood
+  - **Comparative Generation**: Cross-neighborhood analysis when applicable
+  - **Mitigation Strategies**: Template-driven recommendations
+- **Output**: Rich, structured analysis with neighborhood specificity
 
-### Agent 3: Evaluator
+**Key Innovation**: Scalable template system replaces hardcoded analysis functions
+
+**Available Templates**:
+- Transportation/Business Impact Analysis
+- Housing Development Analysis  
+- Business Impact Analysis
+- Climate Impact Analysis
+
+### Agent 3: Evaluator (In Progress)
 **Role**: Calculate before/after impact analysis  
-- **Input**: Candidate plans from Planner
+- **Input**: Template analysis from Planner
 - **Processing**:
   - Use `/unit-estimates` for housing impact
   - Calculate accessibility changes (walk to amenities)
@@ -281,10 +291,10 @@ Monitoring: Vercel Analytics + Supabase Logs
 - [x] Infrastructure and data pipeline
 - [x] Constraint validation system
 - [x] API endpoints with SF integration
-- [ ] **Agent 1**: Interpreter (natural language processing)
-- [ ] **Agent 2**: Planner (scenario generation)
+- [x] **Agent 1**: Enhanced Interpreter with dynamic query classification
+- [x] **Agent 2**: Template-driven Planner with scalable analysis generation
 - [ ] **Agent 3**: Evaluator (impact analysis)
-- [ ] Agent orchestration and testing
+- [x] Enhanced agent architecture and testing
 
 ### Phase 2: Interactive Frontend
 - [ ] Next.js application with SF neighborhood maps
@@ -438,9 +448,15 @@ curl http://localhost:8000/api/v1/neighborhoods/ | jq
 
 ## 📞 Contact & Status
 
-**Current Status**: Phase 1 - Core system 70% complete
-**Next Milestone**: Working 3-agent system demonstration  
-**Timeline**: MVP ready for testing by end of current development cycle
+**Current Status**: Phase 1 - Core system 85% complete
+**Next Milestone**: Complete Agent 3 (Evaluator) and frontend integration
+**Timeline**: Enhanced template-driven system ready for presentation
+
+**🚀 Latest Achievement**: Template-driven agent architecture implemented
+- Dynamic query classification (no hardcoded scenarios)
+- Scalable analysis generation using domain templates
+- Neighborhood-specific factor application
+- Comparative analysis support across multiple neighborhoods
 
 **Project Repository**: [GitHub URL when ready]
 **Documentation**: This CLAUDE.md file (maintained as living document)  
