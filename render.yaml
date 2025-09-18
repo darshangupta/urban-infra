@@ -1,0 +1,51 @@
+services:
+  # PostgreSQL Database with PostGIS
+  - type: pserv
+    name: urban-infra-db
+    env: python
+    plan: starter
+    region: oregon
+    buildCommand: |
+      # PostGIS will be automatically available
+      echo "Database service starting"
+    databases:
+      - name: urban_infra
+        databaseName: urban_infra
+        user: postgres
+
+  # Redis Cache
+  - type: redis
+    name: urban-infra-redis
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+
+  # FastAPI Backend Service  
+  - type: web
+    name: urban-infra-backend
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: urban-infra-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: urban-infra-redis
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        value: https://urban-infra.vercel.app,https://your-custom-domain.com
+    healthCheckPath: /health
