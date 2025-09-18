@@ -82,6 +82,7 @@ function ClimateImpactCanvas({ query, neighborhoods }: { query: string, neighbor
                 "Public facility usage shifts indoors"
               ]}
               color="red"
+              className="bg-red-900/20 border-red-800 text-red-100"
             />
             <ScenarioTimelineCard
               period="Medium-term (6 months - 2 years)"
@@ -92,6 +93,7 @@ function ClimateImpactCanvas({ query, neighborhoods }: { query: string, neighbor
                 "Community warming centers established"
               ]}
               color="yellow"
+              className="bg-amber-900/20 border-amber-800 text-amber-100"
             />
             <ScenarioTimelineCard
               period="Long-term (2+ years)"
@@ -102,6 +104,7 @@ function ClimateImpactCanvas({ query, neighborhoods }: { query: string, neighbor
                 "Infrastructure fundamentally adapted"
               ]}
               color="blue"
+              className="bg-blue-900/20 border-blue-800 text-blue-100"
             />
           </div>
         </CardContent>
@@ -291,31 +294,33 @@ function ScenarioTimelineCard({
   period, 
   probability, 
   impacts, 
-  color 
+  color,
+  className 
 }: { 
   period: string, 
   probability: string, 
   impacts: string[], 
-  color: 'red' | 'yellow' | 'blue' 
+  color: 'red' | 'yellow' | 'blue',
+  className?: string
 }) {
   const colorClasses = {
-    red: 'border-red-200 bg-red-50',
-    yellow: 'border-yellow-200 bg-yellow-50', 
-    blue: 'border-blue-200 bg-blue-50'
+    red: 'border-red-800 bg-red-900/20 text-red-100',
+    yellow: 'border-amber-800 bg-amber-900/20 text-amber-100', 
+    blue: 'border-blue-800 bg-blue-900/20 text-blue-100'
   };
   
   return (
-    <Card className={`${colorClasses[color]} transition-all duration-300 hover:scale-105 hover:shadow-lg`}>
+    <Card className={`${className || colorClasses[color]} transition-all duration-300 hover:scale-105 hover:shadow-lg`}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm">{period}</CardTitle>
-        <Badge variant="outline" className="w-fit">{probability}</Badge>
+        <CardTitle className="text-sm font-medium">{period}</CardTitle>
+        <Badge variant="outline" className="w-fit border-current text-current">{probability}</Badge>
       </CardHeader>
       <CardContent>
         <ul className="text-sm space-y-1">
           {impacts.map((impact, i) => (
             <li key={i} className="flex items-start gap-2">
-              <span className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
-              {impact}
+              <span className="w-1 h-1 bg-current rounded-full mt-2 flex-shrink-0 opacity-80"></span>
+              <span className="text-current">{impact}</span>
             </li>
           ))}
         </ul>

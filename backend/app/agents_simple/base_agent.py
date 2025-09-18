@@ -1001,14 +1001,28 @@ class EvaluatorAgent(BaseAgent):
         super().__init__("Evaluator", "Impact Assessment & Insights")
     
     async def execute(self, context: AgentContext) -> AgentContext:
-        """Evaluate scenarios and generate comprehensive insights"""
-        self.log("Evaluating scenario impacts and generating insights")
+        """Evaluate template analysis and generate comprehensive insights"""
+        classification = context.classification
+        if not classification:
+            self.log("❌ No classification found - cannot evaluate analysis")
+            return context
+            
+        self.log(f"🎯 Evaluating {classification.query_type.value} analysis for {len(classification.neighborhoods)} neighborhoods")
         
-        # Assess impacts for each scenario
-        await self._assess_impacts(context)
+        # Get template analysis from PlannerAgent
+        template_analysis = context.data.get("template_analysis", {})
+        if not template_analysis:
+            self.log("⚠️ No template analysis found - using fallback scenarios")
+            await self._assess_impacts(context)  # Fallback for old scenarios
+        else:
+            # Enhanced evaluation using template analysis
+            await self._evaluate_template_analysis(context, template_analysis)
         
         # Generate comparative insights
         await self._generate_comparative_insights(context)
+        
+        # Generate KPI dashboard
+        context.data["kpi_dashboard"] = self._generate_kpi_dashboard(context, template_analysis)
         
         # Generate follow-up questions
         context.data["follow_up_questions"] = self._generate_follow_up_questions(context)
@@ -1016,11 +1030,624 @@ class EvaluatorAgent(BaseAgent):
         # Final confidence assessment
         context.confidence = self._update_confidence(context)
         
+        self.log(f"✅ Impact evaluation completed with confidence: {context.confidence:.1f}")
         context.reasoning.extend(self.execution_log)
         return context
     
+    async def _evaluate_template_analysis(self, context: AgentContext, template_analysis: Dict[str, Any]):
+        """Enhanced evaluation using template analysis from PlannerAgent"""
+        template_type = template_analysis.get("template_type", "unknown")
+        scenarios = template_analysis.get("scenarios", [])
+        comparative_analysis = template_analysis.get("comparative_analysis", {})
+        
+        self.log(f"📊 Evaluating {template_type} template with {len(scenarios)} scenarios")
+        
+        # Enhanced impact assessment for each scenario
+        evaluated_scenarios = []
+        for scenario in scenarios:
+            evaluated_scenario = await self._deep_impact_assessment(scenario, context, template_type)
+            evaluated_scenarios.append(evaluated_scenario)
+            self.log(f"✓ Deep impact assessment completed for {scenario.get('neighborhood', 'unknown')}")
+        
+        # Store enhanced scenarios
+        context.data["evaluated_scenarios"] = evaluated_scenarios
+        
+        # Evaluate comparative analysis if present
+        if comparative_analysis and len(scenarios) > 1:
+            context.data["comparative_evaluation"] = self._evaluate_comparative_analysis(
+                comparative_analysis, evaluated_scenarios, context
+            )
+    
+    async def _deep_impact_assessment(self, scenario: Dict[str, Any], context: AgentContext, template_type: str) -> Dict[str, Any]:
+        """Perform deep impact assessment on template-generated scenario"""
+        neighborhood = scenario.get("neighborhood", "unknown")
+        analysis_type = scenario.get("analysis_type", "unknown")
+        
+        # Extract key components for evaluation
+        current_conditions = scenario.get("current_conditions", {})
+        projected_impacts = scenario.get("projected_impacts", {})
+        implementation_considerations = scenario.get("implementation_considerations", [])
+        metrics = scenario.get("metrics", {})
+        
+        # Enhanced impact assessment
+        enhanced_impacts = {
+            "before_after_analysis": self._calculate_before_after_metrics(
+                current_conditions, projected_impacts, neighborhood
+            ),
+            "implementation_complexity": self._assess_implementation_complexity(
+                implementation_considerations, neighborhood
+            ),
+            "equity_assessment": self._assess_equity_implications(
+                scenario, neighborhood, context.classification
+            ),
+            "uncertainty_factors": self._identify_uncertainty_factors(
+                scenario, template_type, neighborhood
+            ),
+            "success_indicators": self._define_success_indicators(
+                analysis_type, neighborhood, projected_impacts
+            )
+        }
+        
+        # Combine original scenario with enhanced evaluation
+        evaluated_scenario = {
+            **scenario,
+            "enhanced_impacts": enhanced_impacts,
+            "evaluation_confidence": metrics.get("confidence", 0.7),
+            "evaluation_timestamp": "template_analysis_based"
+        }
+        
+        return evaluated_scenario
+    
+    def _calculate_before_after_metrics(self, current: Dict, projected: Dict, neighborhood: str) -> Dict[str, Any]:
+        """Calculate quantitative before/after metrics"""
+        metrics = {
+            "baseline_metrics": current,
+            "projected_metrics": projected,
+            "change_indicators": {}
+        }
+        
+        # Calculate specific changes based on available data
+        if "traffic_change" in projected:
+            metrics["change_indicators"]["traffic"] = {
+                "direction": "increase" if "+" in str(projected["traffic_change"]) else "decrease",
+                "magnitude": projected["traffic_change"],
+                "significance": "medium"
+            }
+        
+        if "accessibility_score" in projected:
+            baseline_accessibility = 0.6 if neighborhood == "Marina" else 0.8
+            change = float(projected.get("accessibility_score", baseline_accessibility)) - baseline_accessibility
+            metrics["change_indicators"]["accessibility"] = {
+                "direction": "improvement" if change > 0 else "decline",
+                "magnitude": f"{change:+.1f}",
+                "significance": "high" if abs(change) > 0.2 else "medium"
+            }
+        
+        return metrics
+    
+    def _assess_implementation_complexity(self, considerations: List[str], neighborhood: str) -> Dict[str, Any]:
+        """Assess implementation complexity and challenges"""
+        complexity_factors = {
+            "regulatory_complexity": "medium",
+            "community_engagement_needs": "high" if neighborhood == "Mission" else "medium",
+            "technical_challenges": "medium",
+            "coordination_requirements": "high" if len(considerations) > 3 else "medium"
+        }
+        
+        # Risk factors based on considerations
+        risk_factors = []
+        for consideration in considerations:
+            if "resistance" in consideration.lower():
+                risk_factors.append("community_opposition")
+            elif "flood" in consideration.lower():
+                risk_factors.append("environmental_constraints")
+            elif "displacement" in consideration.lower():
+                risk_factors.append("equity_concerns")
+        
+        return {
+            "complexity_factors": complexity_factors,
+            "risk_factors": risk_factors,
+            "estimated_timeline": "2-4 years" if len(risk_factors) > 2 else "1-3 years",
+            "mitigation_strategies": [f"Address {factor}" for factor in risk_factors]
+        }
+    
+    def _assess_equity_implications(self, scenario: Dict, neighborhood: str, classification: QueryClassification) -> Dict[str, Any]:
+        """Assess equity and displacement implications"""
+        equity_score = 0.7  # baseline
+        
+        # Neighborhood-specific equity considerations
+        if neighborhood == "Mission":
+            equity_score = 0.4  # High displacement risk
+            primary_concerns = ["displacement", "cultural_preservation", "affordability"]
+        elif neighborhood == "Marina":
+            equity_score = 0.8  # Lower displacement risk but potential exclusivity
+            primary_concerns = ["accessibility", "equity_of_access"]
+        else:  # Hayes Valley
+            equity_score = 0.6  # Moderate gentrification pressure
+            primary_concerns = ["affordability", "transit_equity"]
+        
+        return {
+            "equity_score": equity_score,
+            "primary_concerns": primary_concerns,
+            "vulnerable_populations": self._identify_vulnerable_populations(neighborhood),
+            "mitigation_recommendations": self._generate_equity_mitigations(neighborhood, primary_concerns)
+        }
+    
+    def _identify_uncertainty_factors(self, scenario: Dict, template_type: str, neighborhood: str) -> List[Dict[str, Any]]:
+        """Identify key uncertainty factors in the analysis"""
+        uncertainties = []
+        
+        # Template-specific uncertainties
+        if "transportation" in template_type:
+            uncertainties.append({
+                "factor": "behavior_change",
+                "description": "Actual adoption of new transportation options",
+                "impact": "high",
+                "mitigation": "Pilot program with phased implementation"
+            })
+        
+        if "housing" in template_type:
+            uncertainties.append({
+                "factor": "market_conditions",
+                "description": "Real estate market changes affecting development feasibility",
+                "impact": "medium",
+                "mitigation": "Flexible financing mechanisms"
+            })
+        
+        # Neighborhood-specific uncertainties
+        if neighborhood == "Marina":
+            uncertainties.append({
+                "factor": "climate_impacts",
+                "description": "Sea level rise affecting long-term viability",
+                "impact": "high",
+                "mitigation": "Adaptive management approach"
+            })
+        
+        return uncertainties
+    
+    def _define_success_indicators(self, analysis_type: str, neighborhood: str, projected_impacts: Dict) -> List[Dict[str, Any]]:
+        """Define measurable success indicators"""
+        indicators = []
+        
+        # Universal indicators
+        indicators.append({
+            "indicator": "community_satisfaction",
+            "target": ">75% positive feedback",
+            "measurement": "Annual community survey",
+            "timeline": "ongoing"
+        })
+        
+        # Analysis-type specific indicators
+        if "transportation" in analysis_type:
+            indicators.extend([
+                {
+                    "indicator": "mode_shift",
+                    "target": "15% reduction in single-occupancy vehicle trips",
+                    "measurement": "Traffic count analysis",
+                    "timeline": "2 years post-implementation"
+                },
+                {
+                    "indicator": "business_impact",
+                    "target": "Maintain or increase local business revenue",
+                    "measurement": "Business survey and sales tax data",
+                    "timeline": "quarterly"
+                }
+            ])
+        
+        return indicators
+    
+    def _identify_vulnerable_populations(self, neighborhood: str) -> List[str]:
+        """Identify vulnerable populations by neighborhood"""
+        populations = {
+            "Mission": ["long-term_residents", "low_income_families", "latino_community", "artists_creators"],
+            "Marina": ["seniors", "families_with_children", "people_with_disabilities"],
+            "Hayes Valley": ["existing_tenants", "local_workers", "transit_dependent_residents"]
+        }
+        return populations.get(neighborhood, ["general_community"])
+    
+    def _generate_equity_mitigations(self, neighborhood: str, concerns: List[str]) -> List[str]:
+        """Generate specific equity mitigation strategies"""
+        mitigations = []
+        
+        for concern in concerns:
+            if concern == "displacement":
+                mitigations.extend([
+                    "Right to return policies for existing residents",
+                    "Community land trust development",
+                    "Tenant protection and relocation assistance"
+                ])
+            elif concern == "affordability":
+                mitigations.extend([
+                    "Deed-restricted affordable housing",
+                    "Community benefits district funding",
+                    "Local hiring requirements"
+                ])
+            elif concern == "cultural_preservation":
+                mitigations.extend([
+                    "Cultural business preservation zones", 
+                    "Community arts and cultural programming",
+                    "Multilingual community engagement"
+                ])
+        
+        return list(set(mitigations))  # Remove duplicates
+    
+    def _evaluate_comparative_analysis(self, comparative_analysis: Dict, evaluated_scenarios: List[Dict], context: AgentContext) -> Dict[str, Any]:
+        """Evaluate the comparative analysis from PlannerAgent"""
+        neighborhoods = [scenario.get("neighborhood") for scenario in evaluated_scenarios]
+        
+        return {
+            "cross_neighborhood_insights": {
+                "implementation_priority": self._rank_implementation_priority(evaluated_scenarios),
+                "resource_sharing_opportunities": self._identify_resource_sharing(evaluated_scenarios),
+                "policy_coordination_needs": self._assess_policy_coordination(evaluated_scenarios)
+            },
+            "equity_comparison": {
+                "relative_benefits": self._compare_equity_benefits(evaluated_scenarios),
+                "displacement_risk_ranking": self._rank_displacement_risk(evaluated_scenarios),
+                "community_readiness": self._assess_community_readiness(evaluated_scenarios)
+            },
+            "implementation_sequence": self._recommend_implementation_sequence(evaluated_scenarios)
+        }
+    
+    def _rank_implementation_priority(self, scenarios: List[Dict]) -> List[Dict[str, Any]]:
+        """Rank scenarios by implementation priority"""
+        ranked = []
+        
+        for scenario in scenarios:
+            neighborhood = scenario.get("neighborhood", "")
+            complexity = scenario.get("enhanced_impacts", {}).get("implementation_complexity", {})
+            equity = scenario.get("enhanced_impacts", {}).get("equity_assessment", {})
+            
+            # Simple priority scoring
+            priority_score = 0.0
+            if equity.get("equity_score", 0) < 0.5:  # High equity need
+                priority_score += 0.4
+            if len(complexity.get("risk_factors", [])) < 3:  # Lower complexity
+                priority_score += 0.3
+            if scenario.get("evaluation_confidence", 0) > 0.7:  # High confidence
+                priority_score += 0.3
+            
+            ranked.append({
+                "neighborhood": neighborhood,
+                "priority_score": priority_score,
+                "rationale": self._generate_priority_rationale(scenario, priority_score)
+            })
+        
+        return sorted(ranked, key=lambda x: x["priority_score"], reverse=True)
+    
+    def _generate_priority_rationale(self, scenario: Dict, score: float) -> str:
+        """Generate rationale for priority ranking"""
+        neighborhood = scenario.get("neighborhood", "")
+        if score > 0.7:
+            return f"{neighborhood}: High priority due to equity needs and implementation readiness"
+        elif score > 0.4:
+            return f"{neighborhood}: Medium priority with balanced considerations"
+        else:
+            return f"{neighborhood}: Lower priority, requires more preparation"
+    
+    def _generate_kpi_dashboard(self, context: AgentContext, template_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate KPI dashboard for visualizing analysis results"""
+        evaluated_scenarios = context.data.get("evaluated_scenarios", [])
+        comparative_evaluation = context.data.get("comparative_evaluation", {})
+        
+        # Extract key metrics across all scenarios
+        kpi_metrics = {
+            "overview": {
+                "total_scenarios": len(evaluated_scenarios),
+                "neighborhoods_analyzed": len(set(s.get("neighborhood") for s in evaluated_scenarios)),
+                "analysis_confidence": context.confidence,
+                "template_type": template_analysis.get("template_type", "unknown")
+            },
+            "equity_metrics": self._calculate_equity_kpis(evaluated_scenarios),
+            "implementation_metrics": self._calculate_implementation_kpis(evaluated_scenarios),
+            "impact_summary": self._calculate_impact_summary_kpis(evaluated_scenarios),
+            "visualization_data": self._prepare_visualization_data(evaluated_scenarios, comparative_evaluation)
+        }
+        
+        return kpi_metrics
+    
+    def _calculate_equity_kpis(self, scenarios: List[Dict]) -> Dict[str, Any]:
+        """Calculate equity-focused KPIs"""
+        if not scenarios:
+            return {"equity_scores": [], "displacement_risks": [], "vulnerable_population_count": 0}
+        
+        equity_scores = []
+        displacement_risks = []
+        vulnerable_populations = set()
+        
+        for scenario in scenarios:
+            enhanced_impacts = scenario.get("enhanced_impacts", {})
+            equity_assessment = enhanced_impacts.get("equity_assessment", {})
+            
+            equity_scores.append(equity_assessment.get("equity_score", 0.5))
+            
+            # Map equity score to displacement risk
+            equity_score = equity_assessment.get("equity_score", 0.5)
+            if equity_score < 0.5:
+                displacement_risks.append("high")
+            elif equity_score < 0.7:
+                displacement_risks.append("medium")
+            else:
+                displacement_risks.append("low")
+            
+            # Collect vulnerable populations
+            vuln_pops = equity_assessment.get("vulnerable_populations", [])
+            vulnerable_populations.update(vuln_pops)
+        
+        return {
+            "average_equity_score": sum(equity_scores) / len(equity_scores) if equity_scores else 0,
+            "equity_score_range": [min(equity_scores), max(equity_scores)] if equity_scores else [0, 0],
+            "displacement_risk_distribution": {
+                "high": displacement_risks.count("high"),
+                "medium": displacement_risks.count("medium"),
+                "low": displacement_risks.count("low")
+            },
+            "vulnerable_population_count": len(vulnerable_populations),
+            "vulnerable_populations": list(vulnerable_populations)
+        }
+    
+    def _calculate_implementation_kpis(self, scenarios: List[Dict]) -> Dict[str, Any]:
+        """Calculate implementation-focused KPIs"""
+        if not scenarios:
+            return {"complexity_distribution": {}, "timeline_distribution": {}, "confidence_scores": []}
+        
+        complexity_levels = []
+        timelines = []
+        confidence_scores = []
+        risk_factors_all = []
+        
+        for scenario in scenarios:
+            enhanced_impacts = scenario.get("enhanced_impacts", {})
+            implementation = enhanced_impacts.get("implementation_complexity", {})
+            
+            # Collect complexity data
+            complexity_factors = implementation.get("complexity_factors", {})
+            avg_complexity = self._average_complexity_score(complexity_factors)
+            complexity_levels.append(avg_complexity)
+            
+            # Collect timeline data
+            timeline = implementation.get("estimated_timeline", "unknown")
+            timelines.append(timeline)
+            
+            # Collect confidence scores
+            confidence = scenario.get("evaluation_confidence", 0.5)
+            confidence_scores.append(confidence)
+            
+            # Collect risk factors
+            risk_factors = implementation.get("risk_factors", [])
+            risk_factors_all.extend(risk_factors)
+        
+        return {
+            "average_complexity": sum(complexity_levels) / len(complexity_levels) if complexity_levels else 0,
+            "timeline_distribution": self._count_timeline_distribution(timelines),
+            "average_confidence": sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0,
+            "common_risk_factors": self._count_risk_factors(risk_factors_all),
+            "implementation_readiness": "high" if sum(confidence_scores) / len(confidence_scores) > 0.7 else "medium"
+        }
+    
+    def _calculate_impact_summary_kpis(self, scenarios: List[Dict]) -> Dict[str, Any]:
+        """Calculate impact summary KPIs"""
+        if not scenarios:
+            return {"positive_impacts": 0, "negative_impacts": 0, "mixed_impacts": 0}
+        
+        impact_types = []
+        uncertainty_levels = []
+        success_indicator_count = 0
+        
+        for scenario in scenarios:
+            enhanced_impacts = scenario.get("enhanced_impacts", {})
+            
+            # Count success indicators
+            success_indicators = enhanced_impacts.get("success_indicators", [])
+            success_indicator_count += len(success_indicators)
+            
+            # Assess uncertainty levels
+            uncertainty_factors = enhanced_impacts.get("uncertainty_factors", [])
+            uncertainty_level = len(uncertainty_factors)
+            uncertainty_levels.append(uncertainty_level)
+            
+            # Assess overall impact direction
+            equity_score = enhanced_impacts.get("equity_assessment", {}).get("equity_score", 0.5)
+            if equity_score > 0.7:
+                impact_types.append("positive")
+            elif equity_score < 0.4:
+                impact_types.append("negative")
+            else:
+                impact_types.append("mixed")
+        
+        return {
+            "impact_distribution": {
+                "positive": impact_types.count("positive"),
+                "negative": impact_types.count("negative"),
+                "mixed": impact_types.count("mixed")
+            },
+            "average_uncertainty": sum(uncertainty_levels) / len(uncertainty_levels) if uncertainty_levels else 0,
+            "total_success_indicators": success_indicator_count,
+            "overall_impact_trend": max(set(impact_types), key=impact_types.count) if impact_types else "unknown"
+        }
+    
+    def _prepare_visualization_data(self, scenarios: List[Dict], comparative_evaluation: Dict) -> Dict[str, Any]:
+        """Prepare data for frontend visualizations"""
+        viz_data = {
+            "neighborhood_comparison": [],
+            "equity_vs_complexity": [],
+            "timeline_chart": [],
+            "risk_matrix": []
+        }
+        
+        for scenario in scenarios:
+            neighborhood = scenario.get("neighborhood", "unknown")
+            enhanced_impacts = scenario.get("enhanced_impacts", {})
+            
+            # Neighborhood comparison data
+            equity_score = enhanced_impacts.get("equity_assessment", {}).get("equity_score", 0.5)
+            complexity = enhanced_impacts.get("implementation_complexity", {})
+            complexity_score = self._average_complexity_score(complexity.get("complexity_factors", {}))
+            
+            viz_data["neighborhood_comparison"].append({
+                "neighborhood": neighborhood,
+                "equity_score": equity_score,
+                "complexity_score": complexity_score,
+                "confidence": scenario.get("evaluation_confidence", 0.5)
+            })
+            
+            # Equity vs Complexity scatter plot data
+            viz_data["equity_vs_complexity"].append({
+                "x": complexity_score,
+                "y": equity_score,
+                "label": neighborhood,
+                "size": scenario.get("evaluation_confidence", 0.5) * 100
+            })
+            
+            # Timeline chart data
+            timeline = complexity.get("estimated_timeline", "unknown")
+            viz_data["timeline_chart"].append({
+                "neighborhood": neighborhood,
+                "timeline": timeline,
+                "priority": self._map_timeline_to_priority(timeline)
+            })
+        
+        return viz_data
+    
+    def _average_complexity_score(self, complexity_factors: Dict[str, str]) -> float:
+        """Convert complexity factors to numerical score"""
+        if not complexity_factors:
+            return 0.5
+        
+        score_mapping = {"low": 0.2, "medium": 0.5, "high": 0.8}
+        scores = [score_mapping.get(level, 0.5) for level in complexity_factors.values()]
+        return sum(scores) / len(scores) if scores else 0.5
+    
+    def _count_timeline_distribution(self, timelines: List[str]) -> Dict[str, int]:
+        """Count timeline distribution"""
+        timeline_counts = {}
+        for timeline in timelines:
+            timeline_counts[timeline] = timeline_counts.get(timeline, 0) + 1
+        return timeline_counts
+    
+    def _count_risk_factors(self, risk_factors: List[str]) -> Dict[str, int]:
+        """Count common risk factors"""
+        risk_counts = {}
+        for risk in risk_factors:
+            risk_counts[risk] = risk_counts.get(risk, 0) + 1
+        return risk_counts
+    
+    def _map_timeline_to_priority(self, timeline: str) -> int:
+        """Map timeline string to priority number"""
+        if "1-3" in timeline:
+            return 1  # High priority
+        elif "2-4" in timeline:
+            return 2  # Medium priority
+        else:
+            return 3  # Lower priority
+    
+    # Missing helper methods for comparative evaluation
+    def _identify_resource_sharing(self, scenarios: List[Dict]) -> List[str]:
+        """Identify resource sharing opportunities"""
+        opportunities = []
+        neighborhoods = [s.get("neighborhood") for s in scenarios]
+        
+        if "Marina" in neighborhoods and "Hayes Valley" in neighborhoods:
+            opportunities.append("Shared climate resilience infrastructure")
+        if "Mission" in neighborhoods and "Hayes Valley" in neighborhoods:
+            opportunities.append("Transit-oriented development coordination")
+        if len(neighborhoods) > 2:
+            opportunities.append("Cross-neighborhood pilot program")
+        
+        return opportunities
+    
+    def _assess_policy_coordination(self, scenarios: List[Dict]) -> List[str]:
+        """Assess policy coordination needs"""
+        coordination_needs = []
+        
+        # Check if multiple scenarios involve similar domains
+        analysis_types = [s.get("analysis_type", "") for s in scenarios]
+        if len(set(analysis_types)) < len(analysis_types):
+            coordination_needs.append("Consistent policy framework across neighborhoods")
+        
+        coordination_needs.extend([
+            "Citywide impact assessment",
+            "Resource allocation coordination",
+            "Timeline synchronization"
+        ])
+        
+        return coordination_needs
+    
+    def _compare_equity_benefits(self, scenarios: List[Dict]) -> Dict[str, str]:
+        """Compare equity benefits across scenarios"""
+        benefits = {}
+        
+        for scenario in scenarios:
+            neighborhood = scenario.get("neighborhood", "")
+            equity_assessment = scenario.get("enhanced_impacts", {}).get("equity_assessment", {})
+            equity_score = equity_assessment.get("equity_score", 0.5)
+            
+            if equity_score > 0.7:
+                benefits[neighborhood] = "high_benefit"
+            elif equity_score > 0.4:
+                benefits[neighborhood] = "medium_benefit"
+            else:
+                benefits[neighborhood] = "requires_attention"
+        
+        return benefits
+    
+    def _rank_displacement_risk(self, scenarios: List[Dict]) -> List[Dict[str, Any]]:
+        """Rank scenarios by displacement risk"""
+        ranked = []
+        
+        for scenario in scenarios:
+            neighborhood = scenario.get("neighborhood", "")
+            equity_score = scenario.get("enhanced_impacts", {}).get("equity_assessment", {}).get("equity_score", 0.5)
+            
+            # Lower equity score = higher displacement risk
+            risk_level = "high" if equity_score < 0.4 else "medium" if equity_score < 0.7 else "low"
+            
+            ranked.append({
+                "neighborhood": neighborhood,
+                "risk_level": risk_level,
+                "equity_score": equity_score
+            })
+        
+        return sorted(ranked, key=lambda x: x["equity_score"])
+    
+    def _assess_community_readiness(self, scenarios: List[Dict]) -> Dict[str, str]:
+        """Assess community readiness for implementation"""
+        readiness = {}
+        
+        for scenario in scenarios:
+            neighborhood = scenario.get("neighborhood", "")
+            implementation = scenario.get("enhanced_impacts", {}).get("implementation_complexity", {})
+            risk_factors = implementation.get("risk_factors", [])
+            
+            if "community_opposition" in risk_factors:
+                readiness[neighborhood] = "low"
+            elif len(risk_factors) > 2:
+                readiness[neighborhood] = "medium"
+            else:
+                readiness[neighborhood] = "high"
+        
+        return readiness
+    
+    def _recommend_implementation_sequence(self, scenarios: List[Dict]) -> List[Dict[str, Any]]:
+        """Recommend implementation sequence"""
+        # Get priority ranking
+        priority_ranking = self._rank_implementation_priority(scenarios)
+        
+        # Convert to sequence with timing
+        sequence = []
+        for i, item in enumerate(priority_ranking):
+            sequence.append({
+                "phase": i + 1,
+                "neighborhood": item["neighborhood"],
+                "timing": f"Phase {i + 1}",
+                "rationale": item["rationale"],
+                "dependencies": "Previous phase completion" if i > 0 else "None"
+            })
+        
+        return sequence
+
     async def _assess_impacts(self, context: AgentContext):
-        """Assess impacts for each scenario"""
+        """FALLBACK: Assess impacts for each scenario (legacy method)"""
         scenarios = context.data.get("scenarios", [])
         
         for scenario in scenarios:
