@@ -34,7 +34,7 @@ interface AnalyticsDashboardProps {
 }
 
 export function AnalyticsDashboard({ data, onExploreMore }: AnalyticsDashboardProps) {
-  const { context, neighborhood_analyses, comparative_insights, scenario_branches, exploration_suggestions, related_questions } = data;
+  const { context, neighborhood_analyses, comparative_insights, scenario_branches, exploration_suggestions, related_questions, agent_reasoning } = data;
 
   return (
     <div className="space-y-6">

@@ -96,6 +96,7 @@ export interface ExploratoryCanvasResult {
   scenario_branches?: ScenarioBranch[];
   exploration_suggestions: string[];
   related_questions: string[];
+  agent_reasoning?: Record<string, string>;
 }
 
 // API client class
