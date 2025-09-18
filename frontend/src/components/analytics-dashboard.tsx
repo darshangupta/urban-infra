@@ -333,15 +333,19 @@ function renderInsightsAnalysis(neighborhood_analyses: any[], comparative_insigh
 }
 
 function renderScenariosAnalysis(scenario_branches: any[] | undefined, context: any, exploration_suggestions: string[]) {
+  // For scenario planning queries, show scenario analysis even if no branches are provided
+  const isScenarioQuery = context.query_type === 'scenario_planning';
+  
   if (!scenario_branches || scenario_branches.length === 0) {
-    return (
-      <div className="space-y-6">
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            This query type doesn't include scenario analysis. Try a "what if" question to explore different scenarios.
-          </AlertDescription>
-        </Alert>
+    if (!isScenarioQuery) {
+      return (
+        <div className="space-y-6">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This query type doesn't include scenario analysis. Try a "what if" question to explore different scenarios.
+            </AlertDescription>
+          </Alert>
 
         {/* Exploration Suggestions */}
         <Card className="transition-all duration-300 hover:shadow-lg">
@@ -364,6 +368,74 @@ function renderScenariosAnalysis(scenario_branches: any[] | undefined, context: 
         </Card>
       </div>
     );
+    } else {
+      // For scenario queries without explicit branches, generate scenario analysis
+      return (
+        <div className="space-y-6">
+          <Card className="transition-all duration-300 hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Zap className="h-5 w-5 text-blue-500" />
+                Scenario Analysis
+              </CardTitle>
+              <CardDescription>
+                Exploring potential outcomes and variations of this scenario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Base Scenario</h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-200">
+                      Current conditions and immediate impacts of implementing the proposed changes.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">Optimistic Scenario</h4>
+                    <p className="text-sm text-green-700 dark:text-green-200">
+                      Best-case outcomes with community support and optimal implementation.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <h4 className="font-medium text-orange-900 dark:text-orange-100 mb-2">Cautious Scenario</h4>
+                    <p className="text-sm text-orange-700 dark:text-orange-200">
+                      Conservative approach addressing potential resistance and constraints.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">Alternative Scenario</h4>
+                    <p className="text-sm text-purple-700 dark:text-purple-200">
+                      Modified approach considering different implementation strategies.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Exploration Suggestions */}
+          <Card className="transition-all duration-300 hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-foreground">Continue Exploring</CardTitle>
+              <CardDescription className="text-foreground/80">
+                Related questions and suggested deep dives
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {exploration_suggestions.map((suggestion, index) => (
+                  <div key={index} className="flex items-start gap-2 p-2 hover:bg-muted/20 rounded transition-colors">
+                    <ArrowRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-foreground/80">{suggestion}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
   }
 
   return (
