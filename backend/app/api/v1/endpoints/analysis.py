@@ -873,7 +873,7 @@ async def explore_urban_query(request: PlanAnalysisRequest):
                     neighborhood=neighborhood,
                     characteristics={
                         **agent_context.data.get(neighborhood, {}).get("characteristics", {}),
-                        "validation_error": agent_context.data.get("validation_error")  # Pass validation error through
+                        **({"validation_error": agent_context.data["validation_error"]} if agent_context.data.get("validation_error") else {})
                     },
                     impact_analysis={
                         "primary": ExploratoryDimension(

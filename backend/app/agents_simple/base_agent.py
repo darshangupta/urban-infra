@@ -6,15 +6,51 @@ No heavy dependencies - just asyncio and httpx
 import asyncio
 import httpx
 import json
-from typing import Dict, Any, List, Optional
+import re
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from enum import Enum
 import time
 
+class QueryType(Enum):
+    """Types of urban planning queries"""
+    ANALYTICAL = "analytical"  # "How does X affect Y?"
+    COMPARATIVE = "comparative"  # "X vs Y"
+    SCENARIO_PLANNING = "scenario_planning"  # "What if...?"
+    SOLUTION_SEEKING = "solution_seeking"  # "How can we...?"
+
+class QueryDomain(Enum):
+    """Primary domains for urban planning analysis"""
+    TRANSPORTATION = "transportation"
+    HOUSING = "housing" 
+    CLIMATE = "climate"
+    ECONOMICS = "economics"
+    GENERAL = "general"
+
+class QueryIntent(Enum):
+    """Specific intent classifications"""
+    IMPACT_ANALYSIS = "impact_analysis"
+    COMPARISON = "comparison"
+    PLANNING = "planning"
+    RESEARCH = "research"
+
 @dataclass
+class QueryClassification:
+    """Structured classification result from Interpreter Agent"""
+    query_type: QueryType
+    primary_domain: QueryDomain
+    intent: QueryIntent
+    neighborhoods: List[str]
+    parameters: Dict[str, Any]  # Numbers, percentages, specific entities
+    confidence: float
+    comparative: bool = False  # Multiple neighborhoods detected
+    
+@dataclass 
 class AgentContext:
-    """Shared context between agents"""
+    """Enhanced shared context between agents"""
     query: str
+    classification: Optional[QueryClassification] = None
     neighborhoods: List[str] = None
     primary_domain: str = None
     confidence: float = 0.0
@@ -76,44 +112,230 @@ class BaseAgent(ABC):
         pass
 
 class InterpreterAgent(BaseAgent):
-    """Agent 1: Understands queries and gathers context"""
+    """Enhanced Agent 1: Intelligent query classification and context gathering"""
     
     def __init__(self):
-        super().__init__("Interpreter", "Query Understanding & Context Gathering")
+        super().__init__("Interpreter", "Intelligent Query Classification & Context Gathering")
     
     async def execute(self, context: AgentContext) -> AgentContext:
-        """Analyze query and gather neighborhood data"""
-        self.log(f"Analyzing query: '{context.query}'")
+        """Intelligently analyze and classify query"""
+        self.log(f"🧠 Analyzing query: '{context.query}'")
         
         # GUARDRAIL: Validate query first
         if not self._is_valid_urban_planning_query(context.query):
             context.confidence = 0.1
-            context.neighborhoods = ["Mission"]  # Default fallback
+            context.neighborhoods = []  # No fallback - be explicit about unknown
             context.primary_domain = "general"
             context.data["validation_error"] = "Query does not appear to be related to urban planning"
             self.log("❌ Query validation failed - not urban planning related")
             context.reasoning.extend(self.execution_log)
             return context
         
-        # Step 1: Extract neighborhoods
-        neighborhoods = self._extract_neighborhoods(context.query)
-        context.neighborhoods = neighborhoods
-        self.log(f"Identified neighborhoods: {neighborhoods}")
+        # Step 1: Intelligent classification
+        classification = self._classify_query(context.query)
+        context.classification = classification
+        context.neighborhoods = classification.neighborhoods
+        context.primary_domain = classification.primary_domain.value
+        self.log(f"🎯 Classification: {classification.query_type.value} | {classification.primary_domain.value}")
+        self.log(f"🏘️ Neighborhoods: {classification.neighborhoods}")
+        self.log(f"📊 Parameters: {classification.parameters}")
         
-        # Step 2: Determine domain
-        domain = self._classify_domain(context.query)
-        context.primary_domain = domain
-        self.log(f"Primary domain: {domain}")
+        # Step 2: Gather neighborhood data (only if neighborhoods detected)
+        if classification.neighborhoods:
+            await self._gather_neighborhood_data(context)
+        else:
+            self.log("⚠️ No specific neighborhoods detected - skipping data gathering")
         
-        # Step 3: Gather neighborhood data using tools
-        await self._gather_neighborhood_data(context)
-        
-        # Step 4: Set confidence
-        context.confidence = self._calculate_confidence(context)
-        self.log(f"Analysis confidence: {context.confidence:.2f}")
+        # Step 3: Set confidence based on classification quality
+        context.confidence = classification.confidence
+        self.log(f"🎲 Classification confidence: {context.confidence:.2f}")
         
         context.reasoning.extend(self.execution_log)
         return context
+    
+    def _classify_query(self, query: str) -> QueryClassification:
+        """Intelligently classify the query using contextual analysis"""
+        query_lower = query.lower()
+        
+        # Extract neighborhoods with context awareness
+        neighborhoods = self._extract_neighborhoods_intelligent(query_lower)
+        
+        # Determine query type based on structure and intent
+        query_type = self._determine_query_type(query_lower)
+        
+        # Classify domain with context
+        domain = self._classify_domain_intelligent(query_lower)
+        
+        # Extract parameters (numbers, percentages, etc.)
+        parameters = self._extract_parameters(query_lower)
+        
+        # Determine intent
+        intent = self._determine_intent(query_lower, query_type)
+        
+        # Calculate confidence based on multiple factors
+        confidence = self._calculate_classification_confidence(
+            query_lower, neighborhoods, query_type, domain, parameters
+        )
+        
+        return QueryClassification(
+            query_type=query_type,
+            primary_domain=domain,
+            intent=intent,
+            neighborhoods=neighborhoods,
+            parameters=parameters,
+            confidence=confidence,
+            comparative=len(neighborhoods) > 1 or "vs" in query_lower or "versus" in query_lower
+        )
+    
+    def _extract_neighborhoods_intelligent(self, query_lower: str) -> List[str]:
+        """Intelligent neighborhood extraction with context clues"""
+        neighborhoods = []
+        
+        # Direct neighborhood name matching
+        neighborhood_patterns = {
+            "mission": ["Mission", "Mission District", "Mission Bay"],
+            "marina": ["Marina", "Marina District"], 
+            "hayes": ["Hayes Valley", "Hayes"],
+            "castro": ["Castro", "Castro District"],
+            "nob hill": ["Nob Hill"],
+            "soma": ["SOMA", "South of Market"],
+            "richmond": ["Richmond", "Richmond District"],
+            "sunset": ["Sunset", "Sunset District"]
+        }
+        
+        for pattern, names in neighborhood_patterns.items():
+            if pattern in query_lower:
+                neighborhoods.extend(names[:1])  # Take first name only
+        
+        # Context clues and landmarks
+        landmark_mapping = {
+            "bart": ["Mission", "Hayes Valley"],  # BART accessible neighborhoods
+            "palace of fine arts": ["Marina"],
+            "mission dolores": ["Mission"],
+            "fillmore": ["Marina"],
+            "valencia": ["Mission"],
+            "chestnut": ["Marina"],
+            "union square": ["Hayes Valley"],  # Transit accessible
+            "crissy field": ["Marina"],
+            "dolores park": ["Mission"]
+        }
+        
+        for landmark, related_neighborhoods in landmark_mapping.items():
+            if landmark in query_lower and not neighborhoods:
+                neighborhoods.extend(related_neighborhoods[:1])
+                break
+        
+        # Remove duplicates while preserving order
+        unique_neighborhoods = []
+        for n in neighborhoods:
+            if n not in unique_neighborhoods:
+                unique_neighborhoods.append(n)
+        
+        return unique_neighborhoods
+    
+    def _determine_query_type(self, query_lower: str) -> QueryType:
+        """Determine the type of query based on structure"""
+        if any(phrase in query_lower for phrase in ["what if", "if we", "suppose", "imagine"]):
+            return QueryType.SCENARIO_PLANNING
+        elif any(phrase in query_lower for phrase in [" vs ", " versus ", "compare", "difference between"]):
+            return QueryType.COMPARATIVE
+        elif any(phrase in query_lower for phrase in ["how can", "how to", "how should", "what should"]):
+            return QueryType.SOLUTION_SEEKING
+        else:
+            return QueryType.ANALYTICAL
+    
+    def _classify_domain_intelligent(self, query_lower: str) -> QueryDomain:
+        """Intelligent domain classification with context"""
+        domain_indicators = {
+            QueryDomain.TRANSPORTATION: [
+                "bike", "transit", "transport", "walkable", "cars", "traffic", 
+                "vehicles", "parking", "congestion", "mobility", "commute", "driving",
+                "bus", "bart", "muni", "subway", "bicycle", "pedestrian", "road"
+            ],
+            QueryDomain.HOUSING: [
+                "housing", "units", "development", "density", "affordable", 
+                "residential", "apartments", "condos", "homes", "rent", "displacement"
+            ],
+            QueryDomain.CLIMATE: [
+                "climate", "temperature", "flood", "environment", "sea level",
+                "weather", "degrees", "warming", "cooling", "storm", "rain"
+            ],
+            QueryDomain.ECONOMICS: [
+                "business", "economic", "revenue", "jobs", "cost", "price",
+                "commercial", "retail", "economy", "income", "tax", "value"
+            ]
+        }
+        
+        domain_scores = {}
+        for domain, keywords in domain_indicators.items():
+            score = sum(1 for keyword in keywords if keyword in query_lower)
+            if score > 0:
+                domain_scores[domain] = score
+        
+        if domain_scores:
+            return max(domain_scores.items(), key=lambda x: x[1])[0]
+        else:
+            return QueryDomain.GENERAL
+    
+    def _extract_parameters(self, query_lower: str) -> Dict[str, Any]:
+        """Extract numerical parameters, percentages, and entities"""
+        parameters = {}
+        
+        # Extract percentages
+        percentage_matches = re.findall(r'(\d+(?:\.\d+)?)%', query_lower)
+        if percentage_matches:
+            parameters["percentages"] = [float(p) for p in percentage_matches]
+        
+        # Extract numbers with context
+        number_matches = re.findall(r'(\d+(?:\.\d+)?)\s*(degrees?|units?|dollars?|years?|percent)', query_lower)
+        for value, unit in number_matches:
+            parameters[f"value_{unit}"] = float(value)
+        
+        # Extract time periods
+        time_patterns = ["years?", "months?", "decades?", "by \d+"]
+        for pattern in time_patterns:
+            matches = re.findall(pattern, query_lower)
+            if matches:
+                parameters["time_period"] = matches[0]
+        
+        return parameters
+    
+    def _determine_intent(self, query_lower: str, query_type: QueryType) -> QueryIntent:
+        """Determine specific intent based on query type and content"""
+        if query_type == QueryType.COMPARATIVE:
+            return QueryIntent.COMPARISON
+        elif query_type == QueryType.SCENARIO_PLANNING:
+            return QueryIntent.PLANNING
+        elif any(word in query_lower for word in ["impact", "affect", "effect", "influence"]):
+            return QueryIntent.IMPACT_ANALYSIS
+        else:
+            return QueryIntent.RESEARCH
+    
+    def _calculate_classification_confidence(
+        self, query_lower: str, neighborhoods: List[str], 
+        query_type: QueryType, domain: QueryDomain, parameters: Dict[str, Any]
+    ) -> float:
+        """Calculate confidence score for classification"""
+        confidence = 0.0
+        
+        # Base confidence for having neighborhoods
+        if neighborhoods:
+            confidence += 0.4
+        
+        # Confidence for clear domain classification
+        if domain != QueryDomain.GENERAL:
+            confidence += 0.3
+        
+        # Confidence for clear query structure
+        query_structure_indicators = ["what if", "how would", "compare", "vs", "affect"]
+        if any(indicator in query_lower for indicator in query_structure_indicators):
+            confidence += 0.2
+        
+        # Confidence for having parameters
+        if parameters:
+            confidence += 0.1
+        
+        return min(confidence, 1.0)
     
     def _extract_neighborhoods(self, query: str) -> List[str]:
         """Extract neighborhood names from query"""
