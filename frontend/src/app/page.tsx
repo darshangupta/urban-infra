@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { QueryInput } from '@/components/query-input';
 import { ExploratoryCanvas } from '@/components/exploratory-canvas';
+import { AnalyticsDashboard } from '@/components/analytics-dashboard';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ErrorBoundary, EmptyState, AnalyticsLoadingSkeleton } from '@/components/error-boundary';
 import { UrbanPlanningAPI } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Building2 } from 'lucide-react';
+import { AlertCircle, Building2, Search } from 'lucide-react';
 import type { ExploratoryCanvasResult } from '@/lib/api';
 
 const api = new UrbanPlanningAPI();
@@ -72,14 +74,14 @@ export default function Home() {
                     <p className="text-lg font-medium text-foreground">Analyzing urban planning impacts...</p>
                     <p className="text-foreground/70">This may take a few moments</p>
                   </div>
-                  <div className="space-y-2 max-w-md mx-auto">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4 mx-auto" />
-                    <Skeleton className="h-4 w-1/2 mx-auto" />
-                  </div>
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Loading Analytics Skeleton */}
+          {isLoading && currentQuery && (
+            <AnalyticsLoadingSkeleton />
           )}
 
           {/* Error State */}
@@ -99,15 +101,40 @@ export default function Home() {
 
           {/* Results */}
           {exploratoryResult && !isLoading && (
-            <div className="space-y-6">
-              {/* Exploratory Canvas */}
-              <ExploratoryCanvas
-                query={currentQuery}
-                queryType={exploratoryResult.context.query_type as any}
-                neighborhoods={exploratoryResult.context.neighborhoods}
-                primaryDomain={exploratoryResult.context.primary_domain}
-              />
-            </div>
+            <ErrorBoundary>
+              <div className="space-y-6">
+                {/* Analytics Dashboard - Comprehensive analysis */}
+                <AnalyticsDashboard
+                  data={exploratoryResult}
+                  onExploreMore={handleSubmitQuery}
+                />
+                
+                {/* Exploratory Canvas - Detailed view for climate/scenario queries */}
+                {(exploratoryResult.context.query_type === 'scenario_planning' && 
+                  exploratoryResult.context.primary_domain === 'climate') && (
+                  <ExploratoryCanvas
+                    query={currentQuery}
+                    queryType={exploratoryResult.context.query_type as any}
+                    neighborhoods={exploratoryResult.context.neighborhoods}
+                    primaryDomain={exploratoryResult.context.primary_domain}
+                  />
+                )}
+              </div>
+            </ErrorBoundary>
+          )}
+
+          {/* Empty State - When no data but no loading */}
+          {!exploratoryResult && !isLoading && currentQuery && (
+            <EmptyState 
+              title="No results found"
+              description="We couldn't find any analysis for your query. Please try a different question."
+              action={
+                <Button variant="outline" onClick={() => setCurrentQuery('')}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Try a new search
+                </Button>
+              }
+            />
           )}
 
           {/* Welcome State - Show when no query has been made */}

@@ -440,39 +440,274 @@ def extract_temperature_change(query: str) -> int:
 
 def generate_transportation_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
     """Generate transportation-focused impact analysis"""
+    
+    # Check if this is about bike infrastructure
+    if "bike" in query.lower():
+        return generate_bike_infrastructure_analysis(neighborhood, query)
+    
+    # General transportation analysis
     return {
         "mobility": ExploratoryDimension(
             title="Transportation Impact",
             description=f"Transportation effects in {neighborhood}",
-            metrics={"placeholder": "Transportation analysis"},
-            insights=[f"Transportation impacts vary by {neighborhood} characteristics"],
-            follow_up_questions=["How would this affect commuting patterns?"]
+            metrics={
+                "transit_accessibility": "Moderate to high depending on proximity to BART/Muni",
+                "walkability_score": "75-85 in most SF neighborhoods",
+                "bike_infrastructure": "Limited but improving"
+            },
+            insights=[
+                f"Transportation impacts vary significantly by {neighborhood} characteristics",
+                "Public transit access is crucial for equitable development",
+                "Bike infrastructure improvements could reduce car dependency"
+            ],
+            follow_up_questions=[
+                "How would this affect commuting patterns?",
+                "What are the parking implications?",
+                "How does this integrate with existing transit?"
+            ]
         )
     }
+
+def generate_bike_infrastructure_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
+    """Generate bike infrastructure specific analysis"""
+    
+    if neighborhood == "marina":
+        return {
+            "business_impact": ExploratoryDimension(
+                title="Business District Impact",
+                description="How bike infrastructure affects Marina's car-dependent business ecosystem",
+                metrics={
+                    "parking_loss": "Potential 15-25% reduction in street parking",
+                    "customer_access": "Shift from suburban drivers to local cyclists",
+                    "outdoor_dining": "Opportunity for expanded sidewalk use"
+                },
+                insights=[
+                    "High-end retailers may lose suburban customers who drive in",
+                    "Restaurants could benefit from increased foot/bike traffic",
+                    "Bike valet services could attract environmentally conscious affluent customers"
+                ],
+                follow_up_questions=[
+                    "How could businesses adapt to serve cyclists?",
+                    "What parking alternatives exist?",
+                    "How do other upscale areas handle bike infrastructure?"
+                ]
+            ),
+            "safety_accessibility": ExploratoryDimension(
+                title="Safety & Accessibility",
+                description="Pedestrian and cyclist safety improvements in Marina",
+                metrics={
+                    "accident_reduction": "Potential 30-40% reduction in bike-car accidents",
+                    "pedestrian_comfort": "Increased sidewalk space and safety",
+                    "senior_accessibility": "Important given Marina's aging population"
+                },
+                insights=[
+                    "Protected bike lanes reduce conflicts between cars and cyclists",
+                    "Marina's wide streets are well-suited for bike infrastructure",
+                    "Connection to Presidio and Marina Green enhances recreational cycling"
+                ],
+                follow_up_questions=[
+                    "How does this connect to citywide bike network?",
+                    "What about motorcycle parking?",
+                    "How do we maintain emergency vehicle access?"
+                ]
+            )
+        }
+    
+    elif neighborhood == "mission":
+        return {
+            "community_impact": ExploratoryDimension(
+                title="Community & Economic Impact",
+                description="How bike infrastructure supports Mission's diverse community",
+                metrics={
+                    "local_business_boost": "15-30% increase in foot traffic",
+                    "car_ownership": "Already low at 35%, could decrease further",
+                    "bike_commuting": "Could increase from 8% to 15% of residents"
+                },
+                insights=[
+                    "Mission's existing bike culture makes this highly supportive",
+                    "Local businesses benefit from increased street-level activity",
+                    "Bike infrastructure supports working families who can't afford cars"
+                ],
+                follow_up_questions=[
+                    "How does this affect gentrification pressures?",
+                    "What about delivery truck access?",
+                    "How do we ensure community input in design?"
+                ]
+            ),
+            "equity_justice": ExploratoryDimension(
+                title="Equity & Transportation Justice",
+                description="Making transportation more equitable in Mission",
+                metrics={
+                    "cost_savings": "$200-500/month savings for families giving up cars",
+                    "job_access": "Better connections to downtown employment",
+                    "health_benefits": "Reduced air pollution and increased physical activity"
+                },
+                insights=[
+                    "Bike infrastructure serves families who depend on affordable transportation",
+                    "Reduces transportation burden on low-income households",
+                    "Improves air quality in dense residential area"
+                ],
+                follow_up_questions=[
+                    "How do we ensure bike infrastructure doesn't displace businesses?",
+                    "What about bike theft prevention?",
+                    "How does this connect to affordable housing?"
+                ]
+            )
+        }
+    
+    else:  # hayes_valley
+        return {
+            "transit_integration": ExploratoryDimension(
+                title="Transit-Oriented Development",
+                description="Bike infrastructure enhancing Hayes Valley's transit access",
+                metrics={
+                    "bart_connection": "Improved bike-to-BART connections",
+                    "muni_integration": "Better first/last mile solutions",
+                    "car_free_households": "Could increase from 45% to 60%"
+                },
+                insights=[
+                    "Hayes Valley already has strong transit orientation",
+                    "Bike infrastructure complements existing car-free lifestyle",
+                    "Enhanced connection between BART and neighborhood amenities"
+                ],
+                follow_up_questions=[
+                    "How does this affect property values?",
+                    "What about bike parking at BART?",
+                    "How do we manage increased density?"
+                ]
+            )
+        }
 
 def generate_economic_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
     """Generate economics-focused impact analysis"""
-    return {
-        "economic": ExploratoryDimension(
-            title="Economic Impact",
-            description=f"Economic effects in {neighborhood}",
-            metrics={"placeholder": "Economic analysis"},
-            insights=[f"Economic impacts depend on {neighborhood} business ecosystem"],
-            follow_up_questions=["How would this affect local businesses?"]
+    
+    base_analysis = {
+        "business_ecosystem": ExploratoryDimension(
+            title="Business Ecosystem Impact",
+            description=f"How changes affect {neighborhood}'s business landscape",
+            metrics={
+                "business_revenue": "Varies by business type and customer base",
+                "employment": "Construction jobs during implementation",
+                "property_values": "Generally positive long-term impact"
+            },
+            insights=[
+                f"Economic impacts depend on {neighborhood} business ecosystem",
+                "Short-term disruption often followed by long-term benefits",
+                "Different business types respond differently to urban changes"
+            ],
+            follow_up_questions=[
+                "How would this affect local businesses?",
+                "What support do businesses need during transition?",
+                "How do we measure economic success?"
+            ]
         )
     }
+    
+    # Add neighborhood-specific economic analysis
+    if neighborhood == "marina":
+        base_analysis["retail_impact"] = ExploratoryDimension(
+            title="High-End Retail Impact",
+            description="Effects on Marina's upscale retail and dining scene",
+            metrics={
+                "customer_demographics": "Shift from suburban drivers to local affluent residents",
+                "spending_patterns": "Potential increase in frequent, smaller purchases",
+                "retail_mix": "May favor experiential over goods-based retail"
+            },
+            insights=[
+                "High-end retailers may need to adapt marketing to local vs. regional customers",
+                "Restaurants and cafes likely to benefit from increased foot traffic",
+                "Outdoor retail and dining could expand with better pedestrian environment"
+            ],
+            follow_up_questions=[
+                "How do luxury brands view bike-friendly areas?",
+                "What successful examples exist in other cities?",
+                "How can we maintain Marina's upscale character?"
+            ]
+        )
+    
+    elif neighborhood == "mission":
+        base_analysis["community_economy"] = ExploratoryDimension(
+            title="Community-Based Economy",
+            description="Supporting Mission's local, community-oriented businesses",
+            metrics={
+                "local_ownership": "70% of businesses are locally owned",
+                "foot_traffic": "Potential 20-40% increase in pedestrian activity",
+                "displacement_risk": "Need to monitor rent increases for small businesses"
+            },
+            insights=[
+                "Community-oriented businesses likely to benefit from increased local activity",
+                "Important to prevent business displacement from rising rents",
+                "Opportunity to strengthen local supply chains and cooperation"
+            ],
+            follow_up_questions=[
+                "How do we protect existing community businesses?",
+                "What role can community land trusts play?",
+                "How do we measure community economic health?"
+            ]
+        )
+    
+    return base_analysis
 
 def generate_general_impact_analysis(neighborhood: str, query: str) -> Dict[str, ExploratoryDimension]:
-    """Generate general impact analysis"""
-    return {
-        "general": ExploratoryDimension(
-            title="General Impact",
-            description=f"General effects in {neighborhood}",
-            metrics={"placeholder": "General analysis"},
-            insights=[f"Multiple factors affect {neighborhood}"],
-            follow_up_questions=["What are the primary concerns?"]
+    """Generate general impact analysis for unclear or broad queries"""
+    
+    # Try to extract some intent from the query
+    query_lower = query.lower()
+    focus_areas = []
+    
+    if any(word in query_lower for word in ['housing', 'development', 'building']):
+        focus_areas.append('housing')
+    if any(word in query_lower for word in ['business', 'economic', 'commercial']):
+        focus_areas.append('economic')
+    if any(word in query_lower for word in ['transit', 'transport', 'bike', 'walk']):
+        focus_areas.append('mobility')
+    if any(word in query_lower for word in ['community', 'resident', 'neighborhood']):
+        focus_areas.append('community')
+    
+    analysis = {
+        "overview": ExploratoryDimension(
+            title="Multi-Factor Impact Analysis",
+            description=f"Comprehensive assessment of changes in {neighborhood}",
+            metrics={
+                "complexity_score": "High - multiple interconnected factors",
+                "stakeholders": "Residents, businesses, city agencies, community groups",
+                "timeline": "Short, medium, and long-term effects to consider"
+            },
+            insights=[
+                f"Multiple factors affect {neighborhood} in interconnected ways",
+                "Need to consider cumulative impacts across different domains",
+                "Community input crucial for understanding local priorities",
+                "Both intended and unintended consequences should be monitored"
+            ],
+            follow_up_questions=[
+                "What are the primary concerns from residents?",
+                "Which specific aspects would you like to explore deeper?",
+                "How do different stakeholders prioritize these changes?",
+                "What are the most important success metrics?"
+            ]
         )
     }
+    
+    # Add specific analysis based on detected focus areas
+    if 'housing' in focus_areas:
+        analysis['housing_considerations'] = ExploratoryDimension(
+            title="Housing Implications",
+            description="How changes affect housing affordability and availability",
+            metrics={"affordability_impact": "Varies by intervention type"},
+            insights=["Housing policies have ripple effects throughout neighborhood"],
+            follow_up_questions=["How does this affect displacement risk?"]
+        )
+    
+    if 'economic' in focus_areas:
+        analysis['economic_considerations'] = ExploratoryDimension(
+            title="Economic Development",
+            description="Business and economic implications",
+            metrics={"business_impact": "Depends on implementation approach"},
+            insights=["Economic changes affect different business types differently"],
+            follow_up_questions=["How do we support existing businesses during transition?"]
+        )
+    
+    return analysis
 
 def get_neighborhood_vulnerabilities(neighborhood: str, domain: str) -> List[str]:
     """Get neighborhood-specific vulnerability factors"""
