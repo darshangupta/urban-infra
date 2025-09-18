@@ -27,7 +27,15 @@ export default function Home() {
     refetch,
   } = useQuery<ExploratoryCanvasResult>({
     queryKey: ['urban-exploration', currentQuery],
-    queryFn: () => api.exploreQuery(currentQuery),
+    queryFn: async () => {
+      console.log('Making API call for query:', currentQuery);
+      const result = await api.exploreQuery(currentQuery);
+      console.log('API result received:', { 
+        hasAgentReasoning: !!result.agent_reasoning, 
+        agentReasoning: result.agent_reasoning 
+      });
+      return result;
+    },
     enabled: !!currentQuery,
     staleTime: 5 * 60 * 1000,
     retry: 2,
@@ -99,8 +107,18 @@ export default function Home() {
             </Alert>
           )}
 
+          {/* Error Display */}
+          {error && (
+            <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>API Error:</strong> {error instanceof Error ? error.message : 'Unknown error occurred'}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Results */}
-          {exploratoryResult && !isLoading && (
+          {exploratoryResult && !isLoading && !error && (
             <ErrorBoundary>
               <div className="space-y-6">
                 {/* Analytics Dashboard - Comprehensive analysis */}
