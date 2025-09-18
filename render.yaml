@@ -13,12 +13,8 @@ services:
         databaseName: urban_infra
         user: postgres
 
-  # Redis Cache
-  - type: redis
-    name: urban-infra-redis
-    plan: starter
-    region: oregon
-    maxmemoryPolicy: allkeys-lru
+  # Redis Cache - REMOVED for free tier deployment
+  # Will add back when we need caching for AI model calls
 
   # FastAPI Backend Service  
   - type: web
@@ -39,11 +35,7 @@ services:
         fromDatabase:
           name: urban-infra-db
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: urban-infra-redis
-          property: connectionString
+      # REDIS_URL removed - not needed for current architecture
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS

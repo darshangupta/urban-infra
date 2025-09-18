@@ -144,7 +144,446 @@ class EvaluatorAgent:
     
     def __init__(self, api_base_url: str = "http://localhost:8000/api/v1"):
         self.api_base_url = api_base_url
+        self.template_evaluators = self._load_template_evaluators()
+    
+    def _load_template_evaluators(self) -> Dict[str, Any]:
+        """Load evaluation methods for different template types"""
+        return {
+            "Traffic Impact Analysis": self._evaluate_traffic_impact,
+            "Business Impact Analysis": self._evaluate_business_impact,
+            "Housing Development Analysis": self._evaluate_housing_impact,
+            "Climate Impact Analysis": self._evaluate_climate_impact
+        }
+    
+    def evaluate_template_analysis(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """
+        ENHANCED: Evaluate template-driven analysis with comprehensive impact calculations
         
+        Args:
+            template_analysis: Output from PlannerAgent.generate_template_analysis()
+            classification: QueryClassification from InterpreterAgent
+            
+        Returns:
+            Comprehensive impact evaluation with KPIs, timeline, and recommendations
+        """
+        
+        template_name = template_analysis.get('template_used', 'Generic Analysis')
+        evaluator = self.template_evaluators.get(template_name, self._evaluate_generic)
+        
+        # Calculate detailed impacts using template-specific evaluator
+        impact_evaluation = evaluator(template_analysis, classification)
+        
+        # Generate KPI dashboard
+        kpi_dashboard = self._generate_kpi_dashboard(impact_evaluation, template_analysis)
+        
+        # Create implementation timeline
+        implementation_timeline = self._generate_implementation_timeline(impact_evaluation, classification)
+        
+        # Calculate before/after metrics
+        before_after_metrics = self._calculate_before_after_metrics(impact_evaluation, template_analysis)
+        
+        return {
+            "evaluation_type": "template_driven",
+            "template_evaluated": template_name,
+            "query_classification": {
+                "intent": classification.intent.value,
+                "domain": classification.domain.value,
+                "neighborhoods": classification.neighborhoods,
+                "comparative": classification.comparative
+            },
+            "impact_evaluation": impact_evaluation,
+            "kpi_dashboard": kpi_dashboard,
+            "implementation_timeline": implementation_timeline,
+            "before_after_metrics": before_after_metrics,
+            "overall_confidence": impact_evaluation.get("confidence", 0.75),
+            "key_recommendations": impact_evaluation.get("recommendations", [])
+        }
+    
+    def _evaluate_traffic_impact(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Evaluate traffic impact analysis with business effects"""
+        
+        neighborhood_analyses = template_analysis.get('neighborhood_analyses', {})
+        evaluations = {}
+        
+        for neighborhood, analysis in neighborhood_analyses.items():
+            factors = analysis.get('relevant_factors', [])
+            metrics = analysis.get('metrics', {})
+            
+            # Calculate business impact from traffic changes
+            if 'car_dependent_residents' in factors:
+                # Marina-type: Traffic increase hurts businesses
+                business_impact = -0.12 if 'increase' in str(classification.query_type.value) else 0.08
+                customer_access_change = -0.15 if 'increase' in str(classification.query_type.value) else 0.10
+            elif 'walkable_corridors' in factors:
+                # Mission-type: Some traffic changes help pedestrian businesses
+                business_impact = 0.08 if 'bike' in str(classification.parameters) else -0.05
+                customer_access_change = 0.12 if 'bike' in str(classification.parameters) else -0.08
+            else:
+                business_impact = 0.02
+                customer_access_change = 0.03
+            
+            evaluations[neighborhood] = {
+                "business_revenue_impact_pct": business_impact,
+                "customer_access_change_pct": customer_access_change,
+                "adaptation_timeline_months": 6 if abs(business_impact) > 0.10 else 3,
+                "mitigation_required": abs(business_impact) > 0.10,
+                "confidence": 0.85
+            }
+        
+        # Overall evaluation
+        avg_business_impact = sum(e['business_revenue_impact_pct'] for e in evaluations.values()) / len(evaluations)
+        
+        return {
+            "analysis_type": "traffic_impact_evaluation",
+            "overall_business_impact_pct": avg_business_impact,
+            "neighborhood_evaluations": evaluations,
+            "total_mitigation_cost_estimate": 50000 * sum(1 for e in evaluations.values() if e['mitigation_required']),
+            "confidence": 0.82,
+            "recommendations": [
+                "Implement business support fund for affected areas",
+                "Phased implementation to minimize disruption",
+                "Regular monitoring of business performance metrics"
+            ]
+        }
+    
+    def _evaluate_business_impact(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Evaluate pure business impact analysis"""
+        
+        neighborhood_analyses = template_analysis.get('neighborhood_analyses', {})
+        evaluations = {}
+        
+        for neighborhood, analysis in neighborhood_analyses.items():
+            factors = analysis.get('relevant_factors', [])
+            
+            # Business type determines impact magnitude and adaptation
+            if 'high_end_retail' in factors:
+                revenue_volatility = 0.15  # Luxury retail more volatile
+                adaptation_capacity = 0.8   # But better resources to adapt
+            elif 'community_businesses' in factors:
+                revenue_volatility = 0.08   # Community businesses more stable
+                adaptation_capacity = 0.6   # But fewer resources
+            else:
+                revenue_volatility = 0.10
+                adaptation_capacity = 0.7
+            
+            # Calculate impact based on query parameters
+            base_impact = 0.05  # Default positive impact
+            if classification.parameters.get('percentage'):
+                # Scale impact by percentage change
+                base_impact *= (1 + classification.parameters['percentage'])
+            
+            evaluations[neighborhood] = {
+                "revenue_impact_pct": base_impact,
+                "revenue_volatility": revenue_volatility,
+                "adaptation_capacity": adaptation_capacity,
+                "break_even_timeline_months": int(12 / adaptation_capacity),
+                "support_programs_needed": adaptation_capacity < 0.7,
+                "confidence": 0.78
+            }
+        
+        return {
+            "analysis_type": "business_impact_evaluation",
+            "neighborhood_evaluations": evaluations,
+            "average_revenue_impact_pct": sum(e['revenue_impact_pct'] for e in evaluations.values()) / len(evaluations),
+            "businesses_needing_support": sum(1 for e in evaluations.values() if e['support_programs_needed']),
+            "confidence": 0.76,
+            "recommendations": [
+                "Tailor support programs to neighborhood business types",
+                "Monitor revenue impacts for first 12 months",
+                "Provide adaptation resources for lower-capacity businesses"
+            ]
+        }
+    
+    def _evaluate_housing_impact(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Evaluate housing development impact"""
+        
+        neighborhood_analyses = template_analysis.get('neighborhood_analyses', {})
+        evaluations = {}
+        
+        for neighborhood, analysis in neighborhood_analyses.items():
+            factors = analysis.get('relevant_factors', [])
+            
+            # Extract housing targets from classification
+            target_units = classification.parameters.get('units', 100)
+            
+            # Displacement risk varies by neighborhood
+            if 'displacement_pressure' in factors:
+                displacement_risk = 0.7  # Mission - high risk
+                community_benefit_multiplier = 1.5
+            elif 'low_density_character' in factors:
+                displacement_risk = 0.2  # Marina - low risk
+                community_benefit_multiplier = 0.8
+            else:
+                displacement_risk = 0.4  # Hayes Valley - medium
+                community_benefit_multiplier = 1.0
+            
+            # Calculate affordability requirements
+            base_affordability = 0.20
+            if 'transit_accessibility' in factors:
+                base_affordability = 0.25  # Higher near transit
+            
+            affordable_units = int(target_units * base_affordability)
+            community_benefit_cost = target_units * 5000 * community_benefit_multiplier  # $5k per unit base
+            
+            evaluations[neighborhood] = {
+                "new_units": target_units,
+                "affordable_units": affordable_units,
+                "displacement_risk_score": displacement_risk,
+                "community_benefit_cost": community_benefit_cost,
+                "implementation_complexity": "high" if displacement_risk > 0.6 else "medium" if displacement_risk > 0.3 else "low",
+                "community_engagement_months": 6 if displacement_risk > 0.6 else 3,
+                "confidence": 0.80
+            }
+        
+        total_units = sum(e['new_units'] for e in evaluations.values())
+        total_affordable = sum(e['affordable_units'] for e in evaluations.values())
+        total_benefit_cost = sum(e['community_benefit_cost'] for e in evaluations.values())
+        
+        return {
+            "analysis_type": "housing_impact_evaluation",
+            "total_new_units": total_units,
+            "total_affordable_units": total_affordable,
+            "overall_affordability_pct": total_affordable / total_units if total_units > 0 else 0,
+            "total_community_benefit_cost": total_benefit_cost,
+            "neighborhood_evaluations": evaluations,
+            "confidence": 0.79,
+            "recommendations": [
+                "Prioritize anti-displacement measures in high-risk areas",
+                "Secure community benefit funding early in process",
+                "Implement robust community engagement timeline"
+            ]
+        }
+    
+    def _evaluate_climate_impact(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Evaluate climate/environmental impact"""
+        
+        neighborhood_analyses = template_analysis.get('neighborhood_analyses', {})
+        evaluations = {}
+        
+        for neighborhood, analysis in neighborhood_analyses.items():
+            factors = analysis.get('relevant_factors', [])
+            
+            # Climate vulnerability assessment
+            if 'waterfront_vulnerability' in factors:
+                climate_vulnerability = 0.9  # Marina - very high
+                adaptation_urgency = "immediate"
+                base_adaptation_cost = 2000000  # $2M
+            elif 'vulnerable_populations' in factors:
+                climate_vulnerability = 0.7  # Mission - high social vulnerability
+                adaptation_urgency = "high"
+                base_adaptation_cost = 1500000  # $1.5M
+            else:
+                climate_vulnerability = 0.5  # Hayes Valley - moderate
+                adaptation_urgency = "medium"
+                base_adaptation_cost = 1000000  # $1M
+            
+            # Temperature impact from parameters
+            temp_change = classification.parameters.get('temperature_change', -2)
+            energy_impact = abs(temp_change) * 0.08  # 8% per degree change
+            
+            evaluations[neighborhood] = {
+                "climate_vulnerability_score": climate_vulnerability,
+                "adaptation_urgency": adaptation_urgency,
+                "estimated_adaptation_cost": base_adaptation_cost,
+                "energy_cost_impact_pct": energy_impact,
+                "implementation_priority": 1 if adaptation_urgency == "immediate" else 2 if adaptation_urgency == "high" else 3,
+                "confidence": 0.72
+            }
+        
+        total_adaptation_cost = sum(e['estimated_adaptation_cost'] for e in evaluations.values())
+        avg_energy_impact = sum(e['energy_cost_impact_pct'] for e in evaluations.values()) / len(evaluations)
+        
+        return {
+            "analysis_type": "climate_impact_evaluation",
+            "total_adaptation_investment": total_adaptation_cost,
+            "average_energy_impact_pct": avg_energy_impact,
+            "neighborhood_evaluations": evaluations,
+            "highest_priority_neighborhood": min(evaluations.keys(), key=lambda k: evaluations[k]['implementation_priority']),
+            "confidence": 0.74,
+            "recommendations": [
+                "Prioritize waterfront neighborhoods for immediate adaptation",
+                "Develop neighborhood-specific resilience strategies",
+                "Secure climate adaptation funding early"
+            ]
+        }
+    
+    def _evaluate_generic(self, template_analysis: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Generic evaluation for unknown template types"""
+        
+        return {
+            "analysis_type": "generic_evaluation",
+            "note": "Generic evaluation applied - specific evaluator not available",
+            "confidence": 0.60,
+            "recommendations": [
+                "Analysis completed with generic methodology",
+                "Consider adding specific evaluator for this template type"
+            ]
+        }
+    
+    def _generate_kpi_dashboard(self, impact_evaluation: Dict[str, Any], template_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate KPI dashboard from impact evaluation"""
+        
+        analysis_type = impact_evaluation.get('analysis_type', 'generic')
+        
+        if analysis_type == "traffic_impact_evaluation":
+            return {
+                "primary_kpis": [
+                    {
+                        "name": "Business Impact",
+                        "value": f"{impact_evaluation.get('overall_business_impact_pct', 0):+.1%}",
+                        "status": "positive" if impact_evaluation.get('overall_business_impact_pct', 0) > 0 else "negative",
+                        "description": "Average business revenue impact"
+                    },
+                    {
+                        "name": "Mitigation Cost",
+                        "value": f"${impact_evaluation.get('total_mitigation_cost_estimate', 0):,}",
+                        "status": "neutral",
+                        "description": "Estimated cost for business support programs"
+                    }
+                ],
+                "implementation_kpis": [
+                    {
+                        "name": "Timeline",
+                        "value": "6 months",
+                        "status": "neutral",
+                        "description": "Expected adaptation timeline"
+                    }
+                ]
+            }
+        
+        elif analysis_type == "housing_impact_evaluation":
+            return {
+                "primary_kpis": [
+                    {
+                        "name": "New Units",
+                        "value": str(impact_evaluation.get('total_new_units', 0)),
+                        "status": "positive",
+                        "description": "Total housing units created"
+                    },
+                    {
+                        "name": "Affordability",
+                        "value": f"{impact_evaluation.get('overall_affordability_pct', 0):.1%}",
+                        "status": "positive" if impact_evaluation.get('overall_affordability_pct', 0) > 0.20 else "neutral",
+                        "description": "Percentage of affordable housing"
+                    },
+                    {
+                        "name": "Community Benefits",
+                        "value": f"${impact_evaluation.get('total_community_benefit_cost', 0):,}",
+                        "status": "neutral",
+                        "description": "Investment in community benefit programs"
+                    }
+                ]
+            }
+        
+        else:
+            return {
+                "primary_kpis": [
+                    {
+                        "name": "Confidence",
+                        "value": f"{impact_evaluation.get('confidence', 0.6):.0%}",
+                        "status": "neutral",
+                        "description": "Analysis confidence level"
+                    }
+                ]
+            }
+    
+    def _generate_implementation_timeline(self, impact_evaluation: Dict[str, Any], classification: Any) -> Dict[str, Any]:
+        """Generate implementation timeline based on evaluation"""
+        
+        analysis_type = impact_evaluation.get('analysis_type', 'generic')
+        
+        if analysis_type == "traffic_impact_evaluation":
+            return {
+                "total_months": 12,
+                "phases": [
+                    {
+                        "name": "Planning & Engagement",
+                        "months": 3,
+                        "activities": ["Business stakeholder meetings", "Support program design", "Baseline metrics collection"]
+                    },
+                    {
+                        "name": "Implementation",
+                        "months": 6,
+                        "activities": ["Infrastructure changes", "Business support activation", "Impact monitoring"]
+                    },
+                    {
+                        "name": "Evaluation & Optimization",
+                        "months": 3,
+                        "activities": ["Impact assessment", "Program adjustments", "Long-term planning"]
+                    }
+                ]
+            }
+        
+        elif analysis_type == "housing_impact_evaluation":
+            return {
+                "total_months": 36,
+                "phases": [
+                    {
+                        "name": "Community Engagement",
+                        "months": 6,
+                        "activities": ["Community meetings", "Anti-displacement planning", "Financing arrangements"]
+                    },
+                    {
+                        "name": "Development",
+                        "months": 24,
+                        "activities": ["Construction", "Community benefit implementation", "Ongoing engagement"]
+                    },
+                    {
+                        "name": "Occupancy & Monitoring",
+                        "months": 6,
+                        "activities": ["Resident move-in", "Community integration", "Long-term monitoring setup"]
+                    }
+                ]
+            }
+        
+        else:
+            return {
+                "total_months": 12,
+                "phases": [
+                    {"name": "Planning", "months": 4, "activities": ["Analysis", "Stakeholder engagement"]},
+                    {"name": "Implementation", "months": 6, "activities": ["Execute changes", "Monitor impacts"]},
+                    {"name": "Evaluation", "months": 2, "activities": ["Assess outcomes", "Plan next steps"]}
+                ]
+            }
+    
+    def _calculate_before_after_metrics(self, impact_evaluation: Dict[str, Any], template_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate before/after comparison metrics"""
+        
+        analysis_type = impact_evaluation.get('analysis_type', 'generic')
+        
+        if analysis_type == "traffic_impact_evaluation":
+            return {
+                "business_revenue": {
+                    "before": 100,  # Baseline index
+                    "after": 100 + (impact_evaluation.get('overall_business_impact_pct', 0) * 100),
+                    "change_pct": impact_evaluation.get('overall_business_impact_pct', 0)
+                },
+                "customer_access": {
+                    "before": 100,
+                    "after": 95,  # Estimated based on traffic changes
+                    "change_pct": -0.05
+                }
+            }
+        
+        elif analysis_type == "housing_impact_evaluation":
+            return {
+                "housing_units": {
+                    "before": 1000,  # Estimated baseline
+                    "after": 1000 + impact_evaluation.get('total_new_units', 0),
+                    "change_absolute": impact_evaluation.get('total_new_units', 0)
+                },
+                "affordable_housing_pct": {
+                    "before": 0.15,  # Estimated baseline 15%
+                    "after": impact_evaluation.get('overall_affordability_pct', 0.20),
+                    "change_pct": impact_evaluation.get('overall_affordability_pct', 0.20) - 0.15
+                }
+            }
+        
+        else:
+            return {
+                "note": "Before/after metrics not available for this analysis type"
+            }
+
     def evaluate_scenarios(self, planning_alternatives: Any) -> ScenarioComparison:
         """
         Main entry point: Convert planning alternatives into comprehensive impact analysis
